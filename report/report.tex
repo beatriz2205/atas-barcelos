@@ -75,7 +75,7 @@ As decisões de desenho foram tomadas com o objetivo de isolar a variável em es
 \label{tab:decisoes}
 \begin{tabular}{>{\raggedright\arraybackslash}p{8cm}>{\raggedright\arraybackslash}p{7cm}}
 \toprule
-	extbf{Decisão} & 	extbf{Justificação} \\ \midrule
+	\textbf{Decisão} & 	\textbf{Justificação} \\ \midrule
 Recuperação fixa partilhada por todos os modelos & Isola a variável em estudo: apenas o gerador muda, permitindo comparação justa entre modelos \\ \midrule
 Chunking por "PROPOSTA N.º X" + janela de 1500 caracteres com overlap de 200 & Cada deliberação fica num chunk coerente; evita misturar propostas diferentes no mesmo chunk \\ \midrule
 Cabeçalho com metadados em cada chunk: [Ata n.º X | tipo | data] & As atas usam datas por extenso; o cabeçalho torna perguntas por data/n.º de ata recuperáveis \\ \midrule
@@ -132,7 +132,7 @@ O framework RAGAS (Retrieval-Augmented Generation Assessment) fornece métricas 
 \label{tab:ragas}
 \begin{tabular}{>{\raggedright\arraybackslash}p{6cm}>{\raggedright\arraybackslash}p{4cm}>{\raggedright\arraybackslash}p{3cm}}
 \toprule
-	extbf{Métrica} & 	extbf{O que mede} & 	extbf{Componente} \\ \midrule
+	\textbf{Métrica} & 	\textbf{O que mede} & 	\textbf{Componente} \\ \midrule
 faithfulness & A resposta é suportada pelos excertos? (anti-alucinação) & Geração \\ \midrule
 answer\_relevancy & A resposta responde mesmo à pergunta? & Geração \\ \midrule
 factual\_correctness & Afirmações da resposta vs. referência (F1) & Geração \\ \midrule
@@ -151,7 +151,7 @@ Para complementar o RAGAS e validar os seus resultados, foram implementadas mét
 \label{tab:metricas-proprias}
 \begin{tabular}{>{\raggedright\arraybackslash}p{6cm}>{\raggedright\arraybackslash}p{6cm}}
 \toprule
-	extbf{Métrica} & 	extbf{Definição} \\ \midrule
+	\textbf{Métrica} & 	\textbf{Definição} \\ \midrule
 valores\_corretos & Percentagem de valores\_esperados presentes na resposta & Avalia precisão factual \\ \midrule
 abstencao\_correta & Respondeu quando havia resposta / recusou quando não havia & Avalia comportamento adequado \\ \midrule
 alucinacao & Respondeu a uma pergunta sem\_resposta (deveria recusar) & Medida direta de alucinação \\ \midrule
@@ -184,7 +184,7 @@ Foram definidos 8 tipos principais de perguntas, cada um testando capacidades es
 \label{tab:tipos-perguntas}
 \begin{tabular}{>{\raggedright\arraybackslash}p{4cm}>{\raggedright\arraybackslash}p{5cm}>{\raggedright\arraybackslash}p{4cm}}
 \toprule
-	extbf{Tipo} & 	extbf{Exemplo} & 	extbf{O que testa} \\ \midrule
+	\textbf{Tipo} & 	\textbf{Exemplo} & 	\textbf{O que testa} \\ \midrule
 factual\_simples & Data da reunião da ata n.º 24 & Extração direta de factos \\ \midrule
 votacao & Foi aprovada por unanimidade? Quem votou contra? & Interpretação de resultados de votação \\ \midrule
 numerico & Valor do apoio à associação X & Precisão em números e valores monetários \\ \midrule
@@ -201,21 +201,21 @@ sem\_resposta & Orçamento do "aeroporto de Barcelos" & Resistência à alucina�
 Para além dos 8 tipos principais, foram adicionadas categorias adicionais para testar a robustez dos modelos face a:
 
 \begin{itemize}
-    \item 	extbf{ruido\_reformulacao}: Perguntas com formulação alternativa mas mesmo conteúdo
-    \item 	extbf{resposta\_com\_justificacao}: Perguntas que exigem justificação da resposta
-    \item 	extbf{resistencia\_a\_premissa\_falsa}: Perguntas com premissas incorretas que o modelo deve corrigir
-    \item 	extbf{resistencia\_a\_entidade\_inexistente}: Perguntas sobre entidades que não existem nas atas
-    \item 	extbf{contradicao\_temporal}: Perguntas com informação temporal contraditória
-    \item 	extbf{resistencia\_a\_instrucao}: Perguntas que tentam forçar o modelo a ignorar as atas
-    \item 	extbf{resistencia\_a\_informacao\_injetada}: Perguntas com informação falsa que o modelo deve verificar
-    \item 	extbf{distincao\_documental}: Perguntas que exigem distinção entre tipos de documentos (ordinária vs. extraordinária)
-    \item 	extbf{abstencao\_alucinacao}: Perguntas vagas onde o modelo deve recusar responder
-    \item 	extbf{resposta\_limitada\_a\_fonte}: Perguntas que exigem que o modelo se limite à informação disponível
+    \item 	\textbf{ruido\_reformulacao}: Perguntas com formulação alternativa mas mesmo conteúdo
+    \item 	\textbf{resposta\_com\_justificacao}: Perguntas que exigem justificação da resposta
+    \item 	\textbf{resistencia\_a\_premissa\_falsa}: Perguntas com premissas incorretas que o modelo deve corrigir
+    \item 	\textbf{resistencia\_a\_entidade\_inexistente}: Perguntas sobre entidades que não existem nas atas
+    \item 	\textbf{contradicao\_temporal}: Perguntas com informação temporal contraditória
+    \item 	\textbf{resistencia\_a\_instrucao}: Perguntas que tentam forçar o modelo a ignorar as atas
+    \item 	\textbf{resistencia\_a\_informacao\_injetada}: Perguntas com informação falsa que o modelo deve verificar
+    \item 	\textbf{distincao\_documental}: Perguntas que exigem distinção entre tipos de documentos (ordinária vs. extraordinária)
+    \item 	\textbf{abstencao\_alucinacao}: Perguntas vagas onde o modelo deve recusar responder
+    \item 	\textbf{resposta\_limitada\_a\_fonte}: Perguntas que exigem que o modelo se limite à informação disponível
 \end{itemize}
 
 \subsection{Implementação Atual}
 
-Atualmente, o ficheiro questions.jsonl contém 	extbf{28 perguntas} distribuídas por:
+Atualmente, o ficheiro questions.jsonl contém 	\textbf{28 perguntas} distribuídas por:
 \begin{itemize}
     \item 3 perguntas factual\_simples (dificuldade: fácil)
     \item 2 perguntas votacao (dificuldade: média)
@@ -232,13 +232,13 @@ Atualmente, o ficheiro questions.jsonl contém 	extbf{28 perguntas} distribuída
 
 Cada pergunta no ficheiro questions.jsonl contém os seguintes campos:
 \begin{itemize}
-    \item 	extbf{id}: Identificador único (ex: Q01, Q02, ...)
-    \item 	extbf{tipo}: Categoria da pergunta
-    \item 	extbf{dificuldade}: Nível de dificuldade (facil, media, dificil)
-    \item 	extbf{pergunta}: Texto da pergunta
-    \item 	extbf{resposta\_referencia}: Resposta correta escrita manualmente a partir das atas
-    \item 	extbf{valores\_esperados}: Lista de valores que devem estar presentes na resposta
-    \item 	extbf{ata\_fonte}: Lista de datas (AAAA-MM-DD) das atas que contêm a informação
+    \item 	\textbf{id}: Identificador único (ex: Q01, Q02, ...)
+    \item 	\textbf{tipo}: Categoria da pergunta
+    \item 	\textbf{dificuldade}: Nível de dificuldade (facil, media, dificil)
+    \item 	\textbf{pergunta}: Texto da pergunta
+    \item 	\textbf{resposta\_referencia}: Resposta correta escrita manualmente a partir das atas
+    \item 	\textbf{valores\_esperados}: Lista de valores que devem estar presentes na resposta
+    \item 	\textbf{ata\_fonte}: Lista de datas (AAAA-MM-DD) das atas que contêm a informação
 \end{itemize}
 
 \section{Implementação Técnica}
@@ -273,7 +273,7 @@ atas-barcelos/
 \subsection{Fluxo de Execução}
 
 \begin{enumerate}
-    \item 	extbf{Ingestão} (ingest.py):
+    \item 	\textbf{Ingestão} (ingest.py):
     \begin{itemize}
         \item Leitura dos PDFs das atas
         \item Extração e limpeza de texto
@@ -282,7 +282,7 @@ atas-barcelos/
         \item Gravação em chunks.jsonl
     \end{itemize}
     
-    \item 	extbf{Indexação} (index.py):
+    \item 	\textbf{Indexação} (index.py):
     \begin{itemize}
         \item Carregamento dos chunks
         \item Geração de embeddings com BAAI/bge-m3
@@ -290,14 +290,14 @@ atas-barcelos/
         \item Persistência em data/chroma/
     \end{itemize}
     
-    \item 	extbf{Execução} (run.py):
+    \item 	\textbf{Execução} (run.py):
     \begin{itemize}
         \item Para cada pergunta, recuperação dos top-5 excertos (uma vez, partilhada)
         \item Para cada modelo, geração da resposta com o contexto recuperado
         \item Gravação das respostas em answers\_<modelo>.jsonl
     \end{itemize}
     
-    \item 	extbf{Avaliação} (evaluate.py):
+    \item 	\textbf{Avaliação} (evaluate.py):
     \begin{itemize}
         \item Cálculo das métricas próprias (determinísticas)
         \item (Opcional) Cálculo das métricas RAGAS com LLM-juiz
@@ -331,9 +331,9 @@ atas-barcelos/
 
 \paragraph{RAG (rag.py)}
 \begin{itemize}
-    \item 	extbf{Retriever}: Consulta o ChromaDB com a pergunta e devolve top-5 excertos
-    \item 	extbf{Generator}: Usa API OpenAI-compatível para gerar respostas
-    \item 	extbf{Prompt System}: Instruções claras para:
+    \item 	\textbf{Retriever}: Consulta o ChromaDB com a pergunta e devolve top-5 excertos
+    \item 	\textbf{Generator}: Usa API OpenAI-compatível para gerar respostas
+    \item 	\textbf{Prompt System}: Instruções claras para:
     \begin{itemize}
         \item Responder apenas com base nos excertos
         \item Usar "A informação não consta das atas fornecidas." quando não há informação
@@ -389,10 +389,10 @@ ollama pull qwen2.5:14b
 
 O pipeline gera os seguintes ficheiros na pasta outputs/:
 \begin{itemize}
-    \item 	extbf{answers\_<modelo>.jsonl}: Respostas brutas de cada modelo para cada pergunta
-    \item 	extbf{resultados\_por\_pergunta.csv}: Uma linha por modelo x pergunta com todas as métricas
-    \item 	extbf{resumo\_por\_modelo.csv}: Médias de todas as métricas por modelo
-    \item 	extbf{resumo\_por\_tipo.csv}: Médias por modelo x tipo de pergunta
+    \item 	\textbf{answers\_<modelo>.jsonl}: Respostas brutas de cada modelo para cada pergunta
+    \item 	\textbf{resultados\_por\_pergunta.csv}: Uma linha por modelo x pergunta com todas as métricas
+    \item 	\textbf{resumo\_por\_modelo.csv}: Médias de todas as métricas por modelo
+    \item 	\textbf{resumo\_por\_tipo.csv}: Médias por modelo x tipo de pergunta
 \end{itemize}
 
 \subsection{Análise Planejada}
