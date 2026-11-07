@@ -27,27 +27,38 @@ def norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+RECUSA = ("nao consta", "nao e possivel", "nao ha informacao", "nao encontr",
+          # pedidos de clarificação (pergunta ambígua) também contam como não responder
+          "necessario indicar", "pode indicar", "indique", "especifique", "clarifica")
+
+
 def absteve(resposta: str) -> bool:
     r = norm(resposta)
-    return any(p in r for p in ("nao consta", "nao e possivel", "nao ha informacao", "nao encontr"))
+    return any(p in r for p in RECUSA)
+
+
+def respondivel(row) -> bool:
+    """A pergunta tem resposta nas atas? Decide-se pela referência, não pelo `tipo`:
+    há tipos (ex.: resistencia_a_entidade_inexistente) cuja resposta certa é recusar."""
+    return not absteve(row["resposta_referencia"])
 
 
 def metricas_proprias(row) -> dict:
-    respondivel = row["tipo"] != "sem_resposta"
+    resp = respondivel(row)
     abst = absteve(row["resposta"])
     out = {
         # 1 se o modelo fez a coisa certa: respondeu quando havia resposta / recusou quando não havia
-        "abstencao_correta": float(abst != respondivel),
-        "alucinacao": float(not respondivel and not abst),       # inventou resposta
-        "falsa_recusa": float(respondivel and abst),              # recusou sem razão
+        "abstencao_correta": float(abst != resp),
+        "alucinacao": float(not resp and not abst),       # inventou resposta
+        "falsa_recusa": float(resp and abst),              # recusou sem razão
     }
     esperados = row.get("valores_esperados") or []
-    if respondivel and esperados:
+    if resp and esperados:
         r = norm(row["resposta"])
         out["valores_corretos"] = sum(norm(v) in r for v in esperados) / len(esperados)
     fontes = row.get("ata_fonte") or []
-    if fontes:  # métrica de retrieval: alguma ata certa nos top-k?
-        out["retrieval_hit@k"] = float(any(a in fontes for a in row["contextos_atas"]))
+    if fontes:  # métrica de retrieval: alguma ata certa (pela data da reunião) nos top-k?
+        out["retrieval_hit@k"] = float(any(d in fontes for d in row["contextos_datas"]))
     return out
 
 
@@ -80,7 +91,7 @@ def avaliar_ragas(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
 
     resultados = []
     # perguntas sem resposta não fazem sentido para estas métricas -> só as respondíveis
-    alvo = df[(df["tipo"] != "sem_resposta") & (df["resposta"].str.len() > 0)]
+    alvo = df[df.apply(respondivel, axis=1) & (df["resposta"].str.len() > 0)]
     for modelo, sub in alvo.groupby("modelo"):
         ds = EvaluationDataset(samples=[
             SingleTurnSample(user_input=r.pergunta, response=r.resposta,
@@ -113,7 +124,7 @@ def main():
     if not args.sem_ragas:
         df = df.merge(avaliar_ragas(df, cfg), on=["id", "modelo"], how="left")
 
-    cols_fora = ["contextos", "contextos_atas", "valores_esperados", "ata_fonte"]
+    cols_fora = ["contextos", "contextos_datas", "valores_esperados", "ata_fonte"]
     df.drop(columns=cols_fora, errors="ignore").to_csv(out / "resultados_por_pergunta.csv", index=False)
 
     num = [c for c in df.select_dtypes("number").columns if c not in ("tokens_in",)]

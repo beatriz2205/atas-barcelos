@@ -46,7 +46,8 @@ def main():
                 "modelo": m["name"],
                 **r,
                 "contextos": [c["text"] for c in ctx],
-                "contextos_atas": [c["metadata"].get("ata_numero") for c in ctx],
+                # data da reunião identifica a ata (os n.º repetem-se entre mandatos)
+                "contextos_datas": [c["metadata"].get("data_reuniao") for c in ctx],
             })
         write_jsonl(out_dir / f"answers_{m['name']}.jsonl", linhas)
         print(f"-> {out_dir / f'answers_{m['name']}.jsonl'}")

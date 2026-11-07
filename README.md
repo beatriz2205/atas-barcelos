@@ -51,7 +51,7 @@ Assim que souberes a lista do professor, encaixa-a nestes eixos e põe-na no `co
 | `sem_resposta` | Orçamento do "aeroporto de Barcelos" | **Alucinação** — deve recusar |
 
 Campos: `pergunta`, `resposta_referencia` (escrita por ti a partir da ata), `valores_esperados`
-(números/nomes que têm de aparecer na resposta), `ata_fonte` (n.º das atas onde está a resposta).
+(números/nomes que têm de aparecer na resposta), `ata_fonte` (datas AAAA-MM-DD das reuniões onde está a resposta — os n.º das atas repetem-se entre mandatos).
 Linhas com `PREENCHER` são ignoradas até serem preenchidas. **Meta: 40–60 perguntas, ≥5 por tipo**,
 idealmente validadas por 2 pessoas do grupo.
 

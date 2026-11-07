@@ -94,14 +94,31 @@ def limpar(texto: str) -> str:
     return texto.strip()
 
 
-def metadados(texto: str, ficheiro: str) -> dict:
-    inicio = texto[:3000]
-    n = re.search(r"(?i)(?:^|\s)a?c?ta\s+n\.?\s*[º°o]\.?\s*(\d+)", inicio)
-    tipo = "extraordinária" if re.search(r"(?i)extraordin", inicio) else "ordinária"
+def metadados(texto_bruto: str, ficheiro: str) -> dict:
+    """Lê n.º, data e tipo do título da ata ("cta n.º X da Reunião ... realizada em ...").
+
+    Recebe o texto ANTES de `limpar()`: no PDF o n.º da ata fica sozinho numa linha
+    e `limpar()` apagá-lo-ia como se fosse n.º de página.
+    """
+    inicio = re.sub(r"\s+", " ", re.sub(r"-{3,}", " ", texto_bruto[:5000]))
+    # Título: "cta n.º X da Reunião ... realizada em <data>." Conforme o extrator, pode não
+    # vir no início (o pymupdf põe-no depois do 1.º parágrafo), por isso procura-se em
+    # vez de cortar. \D{0,40}? tolera palavras fora de ordem ("cta n.º Ordinária 13 da Pública").
+    # Ler o tipo só do título evita apanhar "extraordinária" de propostas (aprovação de atas).
+    m = re.search(r"(?i)\ba?c?ta\s+n\.?\s*[º°o]\.?\D{0,40}?(\d+)[^.]{0,300}\.", inicio)
+    if m:
+        numero, titulo = int(m.group(1)), m.group(0)
+        data = extrair_data(titulo) or extrair_data(inicio)
+    else:
+        # sem título legível (ex.: PDF digitalizado): o nome do ficheiro tem n.º, tipo e data
+        nf = re.search(r"(?i)ata-n\.?o?-(\d+)", ficheiro)
+        numero, titulo = (int(nf.group(1)) if nf else None), Path(ficheiro).stem.replace("-", " ")
+        data = extrair_data(titulo)
+    tipo = "extraordinária" if re.search(r"(?i)extraordin", titulo) else "ordinária"
     return {
         "ficheiro": ficheiro,
-        "ata_numero": int(n.group(1)) if n else None,
-        "data_reuniao": extrair_data(inicio),
+        "ata_numero": numero,
+        "data_reuniao": data,
         "tipo_reuniao": tipo,
     }
 
@@ -159,11 +176,12 @@ def main():
         sys.exit(f"Nenhum PDF em {cfg['paths']['atas_dir']}")
     todos = []
     for pdf in pdfs:
-        texto = limpar(ler_pdf(pdf))
+        bruto = ler_pdf(pdf)
+        texto = limpar(bruto)
         if len(texto) < 200:
             print(f"AVISO: {pdf.name} tem pouco texto — PDF digitalizado? Precisa de OCR.")
             continue
-        meta = metadados(texto, pdf.name)
+        meta = metadados(bruto, pdf.name)
         ch = chunkar(texto, meta, cfg["chunking"]["max_chars"], cfg["chunking"]["overlap_chars"])
         print(f"{pdf.name}: ata {meta['ata_numero']}, {meta['data_reuniao']}, {len(ch)} chunks")
         todos.extend(ch)
