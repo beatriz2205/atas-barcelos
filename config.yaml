@@ -1,0 +1,50 @@
+# Configuração central do projeto. Quando o professor der acesso aos modelos,
+# basta preencher a secção `models` (e `judge`) — o resto do pipeline não muda.
+
+paths:
+  atas_dir: data/atas            # PDFs das atas
+  chunks: data/chunks.jsonl      # gerado por ingest.py
+  chroma_dir: data/chroma        # índice vetorial (gerado por index.py)
+  questions: data/questions.jsonl
+  outputs_dir: outputs
+
+chunking:
+  max_chars: 1500                # ~350-400 tokens
+  overlap_chars: 200
+
+embeddings:
+  # Multilingue, bom em português. Alternativa mais leve:
+  # sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+  model: BAAI/bge-m3
+
+retrieval:
+  top_k: 5                       # igual para todos os modelos -> comparação justa
+
+generation:
+  temperature: 0.0               # determinístico para comparar modelos
+  max_tokens: 512
+
+# Modelos a comparar. Qualquer servidor com API compatível com OpenAI serve
+# (vLLM, Ollama, LM Studio, TGI, Azure, OpenAI...).
+# Para testar já, sem os modelos do professor: instalar o Ollama e fazer
+#   ollama pull qwen2.5:7b && ollama pull llama3.1:8b
+models:
+  - name: qwen2.5-7b
+    base_url: http://localhost:11434/v1
+    model: qwen2.5:7b
+    api_key_env: null            # nome da variável de ambiente com a chave (ou null)
+  - name: llama3.1-8b
+    base_url: http://localhost:11434/v1
+    model: llama3.1:8b
+    api_key_env: null
+  # - name: modelo-do-professor
+  #   base_url: https://servidor-da-uminho/v1
+  #   model: nome-do-modelo
+  #   api_key_env: UMINHO_API_KEY
+
+# Modelo "juiz" usado pelo RAGAS. Deve ser DIFERENTE dos modelos avaliados
+# (evita auto-favorecimento) e, idealmente, o mais forte disponível.
+judge:
+  base_url: http://localhost:11434/v1
+  model: qwen2.5:14b
+  api_key_env: null

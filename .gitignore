@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# Dados gerados / PDFs das atas (não versionados)
+data/atas/*
+!data/atas/.gitkeep
+data/chunks.jsonl
+data/chroma/
+
+# Resultados
+outputs/*
+!outputs/.gitkeep
