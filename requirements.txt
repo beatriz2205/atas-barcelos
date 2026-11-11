@@ -1,11 +1,15 @@
 pymupdf>=1.24
+ocrmypdf>=16.0
 pyyaml>=6.0
 chromadb>=0.5
 sentence-transformers>=3.0
 openai>=1.40
+ollama>=0.4
+python-dotenv>=1.0
 pandas>=2.0
 tqdm>=4.66
 # RAGAS: versão fixada porque a API muda bastante entre versões
 ragas==0.2.15
 langchain-openai>=0.2
+langchain-ollama>=0.2
 langchain-huggingface>=0.1

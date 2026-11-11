@@ -1,4 +1,4 @@
-"""1) Ingestão: PDFs das atas -> texto limpo -> chunks com metadados (data/chunks.jsonl).
+"""1) Ingestão: PDFs -> OCR -> texto limpo -> chunks por pipeline.
 
 Particularidades das atas de Barcelos tratadas aqui:
   - linhas de tracejado "--------" usadas para preencher espaço;
@@ -6,14 +6,17 @@ Particularidades das atas de Barcelos tratadas aqui:
   - capitular na 1.ª letra que o extrator perde ("cta n.º 24" em vez de "Acta n.º 24");
   - deliberações organizadas em "PROPOSTA N.º X", que usamos como fronteira de chunk.
 
-Uso:  python src/ingest.py
+Uso:  python src/ingest.py [--pipeline baseline] [--refazer-ocr]
 """
+import argparse
 import re
+import shutil
+import subprocess
 import sys
 import unicodedata
 from pathlib import Path
 
-from common import load_config, write_jsonl
+from common import load_config, pipeline_paths, resolve_pipeline, write_jsonl
 
 # ---------------------------------------------------------------- datas por extenso
 NUM = {
@@ -169,14 +172,58 @@ def ler_pdf(path: Path) -> str:
         return "\n".join(page.get_text() for page in doc)
 
 
+def aplicar_ocr(origem: Path, destino: Path, ocr_cfg: dict, refazer: bool = False) -> Path:
+    """Cria (ou reutiliza) o PDF pesquisável produzido pelo OCRmyPDF.
+
+    ``--force-ocr`` é deliberado: garante que também PDFs com camada de texto
+    passam pelo mesmo processo antes de chegarem ao embedding/modelo.
+    """
+    if destino.exists() and not refazer:
+        return destino
+    executavel = shutil.which("ocrmypdf")
+    if not executavel:
+        raise RuntimeError(
+            "Não encontrei o comando 'ocrmypdf'. Instala as dependências com "
+            "'pip install -r requirements.txt' e o Tesseract com o idioma português."
+        )
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    if destino.exists():
+        # ``ocrmypdf`` recusa substituir o destino; este ficheiro é um cache
+        # derivado do PDF de origem e só é removido com --refazer-ocr.
+        destino.unlink()
+    cmd = [executavel, "--force-ocr", "--output-type", "pdf", "--language", ocr_cfg.get("language", "por")]
+    if ocr_cfg.get("rotate_pages", False):
+        cmd.append("--rotate-pages")
+    if ocr_cfg.get("deskew", False):
+        cmd.append("--deskew")
+    if ocr_cfg.get("clean", False):
+        cmd.append("--clean")
+    if ocr_cfg.get("remove_background", False):
+        cmd.append("--remove-background")
+    cmd.extend([str(origem), str(destino)])
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(f"OCR falhou para {origem.name} (código {exc.returncode}).") from exc
+    return destino
+
+
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--pipeline", help="Nome do pipeline definido em config.yaml")
+    ap.add_argument("--refazer-ocr", action="store_true", help="Ignora PDFs OCR já em cache")
+    args = ap.parse_args()
+
     cfg = load_config()
+    pipeline_name, pipeline, cfg = resolve_pipeline(cfg, args.pipeline)
+    paths = pipeline_paths(cfg, pipeline_name)
     pdfs = sorted(Path(cfg["paths"]["atas_dir"]).glob("*.pdf"))
     if not pdfs:
         sys.exit(f"Nenhum PDF em {cfg['paths']['atas_dir']}")
     todos = []
     for pdf in pdfs:
-        bruto = ler_pdf(pdf)
+        pdf_ocr = aplicar_ocr(pdf, Path(paths["ocr_dir"]) / pdf.name, pipeline["ocr"], args.refazer_ocr)
+        bruto = ler_pdf(pdf_ocr)
         texto = limpar(bruto)
         if len(texto) < 200:
             print(f"AVISO: {pdf.name} tem pouco texto — PDF digitalizado? Precisa de OCR.")
@@ -185,8 +232,8 @@ def main():
         ch = chunkar(texto, meta, cfg["chunking"]["max_chars"], cfg["chunking"]["overlap_chars"])
         print(f"{pdf.name}: ata {meta['ata_numero']}, {meta['data_reuniao']}, {len(ch)} chunks")
         todos.extend(ch)
-    write_jsonl(cfg["paths"]["chunks"], todos)
-    print(f"\n{len(todos)} chunks -> {cfg['paths']['chunks']}")
+    write_jsonl(paths["chunks"], todos)
+    print(f"\n[{pipeline_name}] {len(todos)} chunks -> {paths['chunks']}")
 
 
 if __name__ == "__main__":

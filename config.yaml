@@ -1,50 +1,102 @@
-# Configuração central do projeto. Quando o professor der acesso aos modelos,
-# basta preencher a secção `models` (e `judge`) — o resto do pipeline não muda.
+# Configuração central. Os modelos e os pipelines RAG são eixos de experiência
+# independentes: fixa-se um pipeline para comparar modelos, ou fixa-se um modelo
+# para comparar pipelines.
 
 paths:
   atas_dir: data/atas            # PDFs das atas
-  chunks: data/chunks.jsonl      # gerado por ingest.py
-  chroma_dir: data/chroma        # índice vetorial (gerado por index.py)
+  pipelines_dir: data/pipelines  # OCR, chunks e índice isolados por pipeline
   questions: data/questions.jsonl
   outputs_dir: outputs
 
-chunking:
-  max_chars: 1500                # ~350-400 tokens
-  overlap_chars: 200
+# A chave nunca é incluída neste ficheiro nem enviada para Git. Cada elemento do
+# grupo coloca a sua própria chave em OLLAMA_TOKEN (ver .env.example).
+ollama:
+  host: http://afonsinho.di.uminho.pt:4590
+  token_env: OLLAMA_TOKEN
+  max_retries: 3
+  retry_delay_s: 5
 
-embeddings:
-  # Multilingue, bom em português. Alternativa mais leve:
-  # sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
-  model: BAAI/bge-m3
+# Cada entrada em `pipelines` é uma configuração RAG COMPLETA. As âncoras YAML
+# só evitam repetição no ficheiro: após leitura, cada pipeline tem as secções
+# OCR, chunking, embeddings, retrieval, generation e prompt.
+pipeline_defaults: &pipeline_defaults
+  ocr:
+    language: por
+    rotate_pages: true
+    deskew: false
+    clean: false
+    remove_background: false
+  chunking:
+    max_chars: 1500              # ~350-400 tokens
+    overlap_chars: 200
+  embeddings:
+    model: BAAI/bge-m3
+  retrieval:
+    top_k: 5
+  generation:
+    temperature: 0.0
+    max_tokens: 512
+  prompt:
+    strict_grounding: true
+    abstention_text: A informação não consta das atas fornecidas.
+    language: português europeu
+    require_citations: true
 
-retrieval:
-  top_k: 5                       # igual para todos os modelos -> comparação justa
+default_pipeline: baseline
+pipelines:
+  # Referência: o pipeline RAG original, agora sempre com OCR antes da extração.
+  baseline:
+    <<: *pipeline_defaults
+    description: OCR com rotação, chunks por proposta, bge-m3, top-5 e prompt com fontes.
 
-generation:
-  temperature: 0.0               # determinístico para comparar modelos
-  max_tokens: 512
+  # Cada variante altera apenas uma decisão, para conclusões interpretáveis.
+  ocr_deskew:
+    <<: *pipeline_defaults
+    description: Baseline com correção de inclinação das páginas digitalizadas.
+    ocr:
+      language: por
+      rotate_pages: true
+      deskew: true
+      clean: false
+      remove_background: false
+  chunks_2500:
+    <<: *pipeline_defaults
+    description: Baseline com chunks maiores, para testar mais contexto por deliberação.
+    chunking:
+      max_chars: 2500
+      overlap_chars: 300
+  top_k_10:
+    <<: *pipeline_defaults
+    description: Baseline com os dez excertos semanticamente mais próximos.
+    retrieval:
+      top_k: 10
+  prompt_sem_fontes:
+    <<: *pipeline_defaults
+    description: Baseline sem obrigação de citar a ata no fim da resposta.
+    prompt:
+      strict_grounding: true
+      abstention_text: A informação não consta das atas fornecidas.
+      language: português europeu
+      require_citations: false
 
-# Modelos a comparar. Qualquer servidor com API compatível com OpenAI serve
-# (vLLM, Ollama, LM Studio, TGI, Azure, OpenAI...).
-# Para testar já, sem os modelos do professor: instalar o Ollama e fazer
-#   ollama pull qwen2.5:7b && ollama pull llama3.1:8b
+# Seis modelos na gama mais compacta disponível: quatro de 8--9B e dois de 14B.
+# O par AMALIA permite comparar SFT e DPO na mesma família e escala.
+# Todos são chamados pelo cliente Ollama autenticado acima.
 models:
-  - name: qwen2.5-7b
-    base_url: http://localhost:11434/v1
-    model: qwen2.5:7b
-    api_key_env: null            # nome da variável de ambiente com a chave (ou null)
-  - name: llama3.1-8b
-    base_url: http://localhost:11434/v1
-    model: llama3.1:8b
-    api_key_env: null
-  # - name: modelo-do-professor
-  #   base_url: https://servidor-da-uminho/v1
-  #   model: nome-do-modelo
-  #   api_key_env: UMINHO_API_KEY
+  - name: qwen3-8b
+    model: qwen3:8b
+  - name: gervasio-8b-ptpt
+    model: hf.co/mradermacher/gervasio-8b-portuguese-ptpt-decoder-GGUF:Q4_K_M
+  - name: amalia-0626-dpo-9b
+    model: amalia-9b-0626-dpo:latest
+  - name: amalia-0626-sft-9b
+    model: amalia-9b-0626-sft:latest
+  - name: phi4-14b
+    model: phi4:14b
+  - name: ministral-3-14b
+    model: ministral-3:14b
 
-# Modelo "juiz" usado pelo RAGAS. Deve ser DIFERENTE dos modelos avaliados
-# (evita auto-favorecimento) e, idealmente, o mais forte disponível.
+# Orquestrador/juiz RAGAS: não gera as respostas experimentais; avalia-as.
+# Tem 26B, acima dos geradores mas mais económico do que o anterior modelo de 119B.
 judge:
-  base_url: http://localhost:11434/v1
-  model: qwen2.5:14b
-  api_key_env: null
+  model: gemma4:26b

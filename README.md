@@ -4,7 +4,7 @@ Objetivo: comparar vários LLMs a extrair informação das atas das reuniões de
 usando o **mesmo pipeline RAG** para todos e avaliando com **RAGAS** + métricas próprias.
 
 ```
-PDFs atas ──► ingest.py ──► chunks.jsonl ──► index.py ──► ChromaDB (bge-m3)
+PDFs atas ──► OCRmyPDF ──► ingest.py ──► chunks.jsonl ──► index.py ──► ChromaDB (bge-m3)
                                                                │  top-k (igual p/ todos)
 questions.jsonl ──────────────────────────────► run.py ◄───────┘
                                                   │  modelo A, B, C... (API OpenAI-compatível)
@@ -24,16 +24,21 @@ questions.jsonl ─────────────────────�
 | Juiz RAGAS ≠ modelos avaliados | Evita que o juiz favoreça o próprio modelo. |
 | Embeddings multilingues (bge-m3) | As atas estão em português europeu. |
 
-## 2. Que modelos comparar
+## 2. Modelos selecionados
 
-Juntar modelos que variem **num eixo de cada vez**, para as conclusões serem interpretáveis:
+Foram selecionados seis modelos na gama de **8–14B parâmetros**. Qwen 3 8B e
+Gervásio 8B PT-PT cobrem, respetivamente, uma referência generalista e uma
+especializada em português europeu. AMALIA 0626 SFT 9B e AMALIA 0626 DPO 9B formam
+uma comparação controlada: mantêm família e escala, variando a estratégia de
+afinação. Phi-4 14B e Ministral 3 14B acrescentam dois modelos ligeiramente
+maiores, sem entrar na gama de dezenas ou centenas de milhares de milhões de
+parâmetros. A diferença de escala é registada na análise: as comparações mais
+controladas são entre AMALIA SFT/DPO, os modelos de 8–9B e os dois de 14B.
 
-- **Mesma gama de tamanho (7–9B), famílias diferentes** — ex.: Llama 3.x 8B, Qwen 2.5 7B, Mistral 7B, Gemma 9B. Pergunta: que família lida melhor com PT-PT administrativo?
-- **Mesma família, tamanhos diferentes** — ex.: Qwen 7B vs 14B vs 32B. Pergunta: compensa o custo de um modelo maior?
-- **Genérico vs. treinado para português** — se o professor tiver algum modelo PT-PT (ex.: Gervásio, AMALIA), comparar com um genérico do mesmo tamanho.
-- (Opcional) **Um modelo comercial como teto de referência** (GPT/Claude/Gemini).
-
-Assim que souberes a lista do professor, encaixa-a nestes eixos e põe-na no `config.yaml`.
+O orquestrador/juiz RAGAS é `gemma4:26b`: tem capacidade superior aos geradores,
+mas é substancialmente mais económico do que um modelo de 119B. Apenas produz as
+avaliações RAGAS, nunca respostas incluídas na comparação. A configuração efetiva
+está em `config.yaml`.
 
 ## 3. Conjunto de perguntas (`data/questions.jsonl`)
 
@@ -87,20 +92,55 @@ para mostrar que os erros vêm da geração e não da pesquisa (ou para comparar
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
+# Cada membro do grupo faz isto uma vez, no seu clone local.
+cp .env.example .env
+# editar .env e definir OLLAMA_TOKEN com a sua própria chave
+python src/check_ollama.py  # confirma a chave e o acesso antes de correr a experiência
+
 # 1. pôr os PDFs das atas em data/atas/  (cm-barcelos.pt → Reuniões de Câmara)
-python src/ingest.py          # verifica no output se n.º de ata e datas foram bem extraídos
-python src/index.py
+# O OCRmyPDF requer também Tesseract e o pacote de língua portuguesa no sistema.
+# Ex. Debian/Ubuntu: sudo apt install tesseract-ocr tesseract-ocr-por ghostscript
+python src/ingest.py --pipeline baseline
+python src/index.py --pipeline baseline
 
-# 2. para testar já, sem os modelos do professor: Ollama local
-ollama pull qwen2.5:7b && ollama pull llama3.1:8b && ollama pull qwen2.5:14b
-
-python src/run.py --limit 3                  # teste rápido
-python src/run.py                            # tudo
+python src/run.py --pipeline baseline --limit 3  # teste rápido
+python src/run.py --pipeline baseline            # tudo
 python src/evaluate.py --sem-ragas           # métricas próprias (rápido)
 python src/evaluate.py                       # + RAGAS (lento: várias chamadas ao juiz/pergunta)
 ```
 
+O cliente usa o endpoint Ollama autenticado `afonsinho.di.uminho.pt:4590`. A chave
+é lida da variável `OLLAMA_TOKEN` (ou automaticamente do ficheiro local `.env`),
+nunca de `config.yaml`; `.env` está ignorado pelo Git. Cada pessoa pode assim correr
+o projeto com a sua key, incluindo em simultâneo. Erros 504 são repetidos até três
+vezes, com cinco segundos entre tentativas.
+
 Resultados em `outputs/`: `resumo_por_modelo.csv`, `resumo_por_tipo.csv`, `resultados_por_pergunta.csv`.
+
+### Pipelines RAG e comparação justa
+
+Um pipeline é a configuração RAG inteira: OCR, limpeza/chunking, embeddings,
+retrieval, geração e prompt. Todos os PDFs são processados pelo OCRmyPDF com
+`--force-ocr`, inclusive quando já contêm texto; portanto, é sempre texto OCR que
+chega aos embeddings e aos LLMs. Os PDFs OCR, chunks e índice ficam em
+`data/pipelines/<pipeline>/`, impedindo reutilização acidental de artefactos.
+
+O `baseline` reproduz as decisões RAG originais, com OCR adicionado. As variantes
+incluídas alteram uma só decisão: `ocr_deskew`, `chunks_2500`, `top_k_10` e
+`prompt_sem_fontes`. Para comparar modelos, usa sempre o mesmo pipeline. Para
+comparar pipelines, fixa o mesmo modelo:
+
+```bash
+for p in baseline ocr_deskew chunks_2500 top_k_10 prompt_sem_fontes; do
+  python src/ingest.py --pipeline "$p"
+  python src/index.py --pipeline "$p"
+  python src/run.py --pipeline "$p" --models qwen3-8b
+done
+python src/evaluate.py --sem-ragas
+```
+
+As respostas incluem o campo `pipeline`; os resumos são agrupados por `pipeline` e
+`modelo`. Para recriar um OCR em cache, usa `python src/ingest.py --refazer-ocr`.
 
 ## 6. Próximos passos
 

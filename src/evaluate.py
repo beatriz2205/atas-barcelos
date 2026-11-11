@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from common import load_config, read_jsonl
+from common import load_config, read_jsonl, resolve_pipeline
 
 
 # ---------------------------------------------------------------- métricas próprias
@@ -76,11 +76,22 @@ def avaliar_ragas(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     from langchain_huggingface import HuggingFaceEmbeddings
 
     j = cfg["judge"]
-    key = os.environ.get(j["api_key_env"], "") if j.get("api_key_env") else "not-needed"
-    judge = LangchainLLMWrapper(ChatOpenAI(base_url=j["base_url"], model=j["model"],
-                                           api_key=key or "not-needed", temperature=0))
-    emb = LangchainEmbeddingsWrapper(HuggingFaceEmbeddings(model_name=cfg["embeddings"]["model"]))
+    if cfg.get("ollama"):
+        from langchain_ollama import ChatOllama
 
+        token_env = cfg["ollama"]["token_env"]
+        token = os.environ.get(token_env)
+        if not token:
+            raise RuntimeError(f"Falta a variável {token_env}; configura a tua chave em .env.")
+        judge_llm = ChatOllama(
+            base_url=cfg["ollama"]["host"], model=j["model"], temperature=0,
+            client_kwargs={"headers": {"Authorization": f"Bearer {token}"}},
+        )
+    else:
+        key = os.environ.get(j["api_key_env"], "") if j.get("api_key_env") else "not-needed"
+        judge_llm = ChatOpenAI(base_url=j["base_url"], model=j["model"],
+                                api_key=key or "not-needed", temperature=0)
+    judge = LangchainLLMWrapper(judge_llm)
     metricas = [
         Faithfulness(),                      # a resposta é suportada pelos excertos?
         ResponseRelevancy(),                 # a resposta responde à pergunta?
@@ -92,7 +103,11 @@ def avaliar_ragas(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     resultados = []
     # perguntas sem resposta não fazem sentido para estas métricas -> só as respondíveis
     alvo = df[df.apply(respondivel, axis=1) & (df["resposta"].str.len() > 0)]
-    for modelo, sub in alvo.groupby("modelo"):
+    for (pipeline, modelo), sub in alvo.groupby(["pipeline", "modelo"]):
+        _, _, pipeline_cfg = resolve_pipeline(cfg, pipeline)
+        emb = LangchainEmbeddingsWrapper(
+            HuggingFaceEmbeddings(model_name=pipeline_cfg["embeddings"]["model"])
+        )
         ds = EvaluationDataset(samples=[
             SingleTurnSample(user_input=r.pergunta, response=r.resposta,
                              retrieved_contexts=list(r.contextos), reference=r.resposta_referencia)
@@ -101,10 +116,10 @@ def avaliar_ragas(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
         res = evaluate(ds, metrics=metricas, llm=judge, embeddings=emb,
                        run_config=RunConfig(max_workers=4, timeout=180))
         rdf = res.to_pandas()
-        rdf["id"], rdf["modelo"] = sub["id"].values, modelo
+        rdf["id"], rdf["modelo"], rdf["pipeline"] = sub["id"].values, modelo, pipeline
         resultados.append(rdf.drop(columns=["user_input", "response", "retrieved_contexts",
                                             "reference"], errors="ignore"))
-    return pd.concat(resultados) if resultados else pd.DataFrame(columns=["id", "modelo"])
+    return pd.concat(resultados) if resultados else pd.DataFrame(columns=["id", "modelo", "pipeline"])
 
 
 # ---------------------------------------------------------------- main
@@ -119,18 +134,21 @@ def main():
     if not linhas:
         raise SystemExit("Sem respostas em outputs/. Corre primeiro src/run.py")
     df = pd.DataFrame(linhas)
+    # Compatibilidade com resultados gerados antes da introdução de pipelines.
+    if "pipeline" not in df:
+        df["pipeline"] = cfg["default_pipeline"]
     df = pd.concat([df, pd.DataFrame([metricas_proprias(r) for r in linhas])], axis=1)
 
     if not args.sem_ragas:
-        df = df.merge(avaliar_ragas(df, cfg), on=["id", "modelo"], how="left")
+        df = df.merge(avaliar_ragas(df, cfg), on=["id", "modelo", "pipeline"], how="left")
 
     cols_fora = ["contextos", "contextos_datas", "valores_esperados", "ata_fonte"]
     df.drop(columns=cols_fora, errors="ignore").to_csv(out / "resultados_por_pergunta.csv", index=False)
 
     num = [c for c in df.select_dtypes("number").columns if c not in ("tokens_in",)]
-    resumo = df.groupby("modelo")[num].mean().round(3)
+    resumo = df.groupby(["pipeline", "modelo"])[num].mean().round(3)
     resumo.to_csv(out / "resumo_por_modelo.csv")
-    df.groupby(["modelo", "tipo"])[num].mean().round(3).to_csv(out / "resumo_por_tipo.csv")
+    df.groupby(["pipeline", "modelo", "tipo"])[num].mean().round(3).to_csv(out / "resumo_por_tipo.csv")
     print(resumo.T.to_string())
 
 

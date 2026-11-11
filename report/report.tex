@@ -81,7 +81,7 @@ Chunking por "PROPOSTA N.º X" + janela de 1500 caracteres com overlap de 200 & 
 Cabeçalho com metadados em cada chunk: [Ata n.º X | tipo | data] & As atas usam datas por extenso; o cabeçalho torna perguntas por data/n.º de ata recuperáveis \\ \midrule
 temperature = 0 & Garante respostas determinísticas e reprodutíveis para comparação entre modelos \\ \midrule
 Prompt obriga a responder "A informação não consta das atas fornecidas." quando não há informação & Permite medir alucinação de forma objetiva e determinística \\ \midrule
-Juiz RAGAS diferente dos modelos avaliados (qwen2.5:14b) & Evita que o juiz favoreça o próprio modelo, garantindo avaliação neutra \\ \midrule
+Orquestrador/juiz RAGAS separado dos modelos avaliados (Gemma 4, 26B) & Evita que o juiz favoreça o próprio modelo, com capacidade superior e custo razoável \\ \midrule
 Embeddings multilingues: BAAI/bge-m3 & Modelos otimizados para português europeu e multilingue \\ \midrule
 Top-k = 5 para todos os modelos & Recuperação idêntica para todos, eliminando variabilidade \\ \midrule
 Limpeza de texto: remoção de tracejados, números de página, hifenização & Normalização do texto extraído dos PDFs \\ \midrule
@@ -105,20 +105,15 @@ Os modelos serão selecionados com o objetivo de comparar o desempenho de difere
 
 \subsection{Modelos a Avaliar}
 
-A seleção final dos modelos será definida após acesso aos recursos computacionais disponíveis. Pretende-se avaliar modelos com aproximadamente o mesmo número de parâmetros, de diferentes famílias, de forma a isolar a variável da arquitetura.
+Foram selecionados seis modelos entre 8 e 14 mil milhões de parâmetros, todos disponíveis na infraestrutura local: Qwen~3~8B, Gervásio~8B PT-PT, AMALIA 0626 SFT~9B, AMALIA 0626 DPO~9B, Phi-4~14B e Ministral~3~14B. Esta é a gama compacta disponível mais próxima de 10B; o único par da mesma família é deliberado e permite uma comparação controlada entre estratégias de afinação.
 
-A configuração do pipeline (ficheiro config.yaml) está preparada para integrar qualquer modelo com API compatível com OpenAI (vLLM, Ollama, LM Studio, TGI, Azure, OpenAI, etc.). Para testes preliminares locais, pode-se utilizar modelos disponíveis via Ollama.
+Qwen funciona como referência generalista e Gervásio testa especialização em português europeu. AMALIA SFT e DPO permitem avaliar o efeito da estratégia de afinação mantendo a família e a escala constantes. Phi-4 e Ministral são comparados entre si na mesma escala de 14B. Os resultados serão sempre apresentados com o número de parâmetros: não se atribuirá uma diferença entre 8B e 14B apenas à família do modelo. Os identificadores exatos, endpoint e método de autenticação estão registados em \texttt{config.yaml}; cada membro usa a sua chave local \texttt{OLLAMA_TOKEN}, que não é versionada.
 
-\subsection{Modelo Juiz}
+\subsection{Orquestrador e Modelo Juiz}
 
-Para avaliação com RAGAS, será selecionado um modelo juiz diferente de todos os modelos avaliados, preferencialmente com maior capacidade. O modelo juiz deve:
-\begin{itemize}
-    \item Ser diferente de todos os modelos em avaliação
-    \item Ter capacidade suficiente para garantir avaliações precisas
-    \item Estar acessível através da mesma infraestrutura
-\end{itemize}
+O modelo \texttt{gemma4:26b} foi escolhido como orquestrador/juiz das métricas RAGAS. Tem 26B parâmetros, acima dos geradores de 8--14B, e não pertence à amostra avaliada. Desta forma, reduz-se o risco de auto-favorecimento sem recorrer ao custo de um modelo de 119B.
 
-A configuração atual permite a utilização de modelos locais para este propósito, garantindo consistência na avaliação.
+Neste projeto, ``orquestrador'' significa o avaliador que coordena o julgamento das respostas nas métricas RAGAS; não responde às perguntas do conjunto experimental. As respostas medidas são sempre produzidas apenas pelos seis modelos selecionados.
 \section{Métricas de Avaliação}
 \label{sec:metricas}
 
@@ -362,11 +357,10 @@ source .venv/bin/activate
 pip install -r requirements.txt
 \end{verbatim}
 
-Modelos locais para teste (Ollama):
+Modelos locais para teste (os identificadores completos estão em \texttt{config.yaml}):
 \begin{verbatim}
-ollama pull qwen2.5:7b
-ollama pull llama3.1:8b
-ollama pull qwen2.5:14b
+ollama pull qwen3:8b
+ollama pull gemma4:26b
 \end{verbatim}
 
 \subsection{Passos de Execução}

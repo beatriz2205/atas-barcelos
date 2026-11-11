@@ -1,23 +1,30 @@
 """Componentes RAG: recuperação (comum a todos os modelos) e geração (por modelo)."""
 import time
 
-from common import make_client
+from common import make_client, ollama_chat, resolve_pipeline
 from index import get_collection
 
 NAO_CONSTA = "A informação não consta das atas fornecidas."
 
-SYSTEM_PROMPT = f"""És um assistente que responde a perguntas sobre as atas das reuniões da Câmara Municipal de Barcelos.
-Regras:
-1. Responde APENAS com base nos excertos fornecidos. Não uses conhecimento externo.
-2. Se a resposta não estiver nos excertos, responde exatamente: "{NAO_CONSTA}"
-3. Responde em português europeu, de forma concisa e factual.
-4. Indica no fim a(s) fonte(s) no formato (Ata n.º X, AAAA-MM-DD)."""
+def build_system_prompt(prompt_cfg: dict) -> str:
+    regras = [
+        "Responde APENAS com base nos excertos fornecidos. Não uses conhecimento externo."
+        if prompt_cfg["strict_grounding"] else "Usa os excertos como fonte principal.",
+        f'Se a resposta não estiver nos excertos, responde exatamente: "{prompt_cfg["abstention_text"]}"',
+        f'Responde em {prompt_cfg["language"]}, de forma concisa e factual.',
+    ]
+    if prompt_cfg["require_citations"]:
+        regras.append("Indica no fim a(s) fonte(s) no formato (Ata n.º X, AAAA-MM-DD).")
+    return "És um assistente que responde a perguntas sobre as atas das reuniões da Câmara Municipal de Barcelos.\nRegras:\n" + "\n".join(
+        f"{i}. {regra}" for i, regra in enumerate(regras, 1)
+    )
 
 
 class Retriever:
-    def __init__(self, cfg):
-        self.col = get_collection(cfg)
-        self.k = cfg["retrieval"]["top_k"]
+    def __init__(self, cfg, pipeline_name=None):
+        self.col = get_collection(cfg, pipeline_name)
+        _, _, resolved_cfg = resolve_pipeline(cfg, pipeline_name)
+        self.k = resolved_cfg["retrieval"]["top_k"]
 
     def __call__(self, pergunta: str, k: int | None = None) -> list[dict]:
         r = self.col.query(query_texts=[pergunta], n_results=k or self.k)
@@ -33,26 +40,36 @@ def build_prompt(pergunta: str, contextos: list[str]) -> str:
 
 
 class Generator:
-    def __init__(self, model_cfg: dict, gen_cfg: dict):
+    def __init__(self, model_cfg: dict, rag_cfg: dict):
         self.cfg = model_cfg
-        self.gen = gen_cfg
-        self.client = make_client(model_cfg)
+        self.gen = rag_cfg["generation"]
+        self.system_prompt = build_system_prompt(rag_cfg["prompt"])
+        self.ollama_cfg = rag_cfg.get("ollama")
+        self.client = make_client(model_cfg, self.ollama_cfg)
 
     def __call__(self, pergunta: str, contextos: list[str]) -> dict:
         t0 = time.perf_counter()
-        r = self.client.chat.completions.create(
-            model=self.cfg["model"],
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": build_prompt(pergunta, contextos)},
-            ],
-            temperature=self.gen["temperature"],
-            max_tokens=self.gen["max_tokens"],
-        )
-        u = getattr(r, "usage", None)
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": build_prompt(pergunta, contextos)},
+        ]
+        if self.ollama_cfg:
+            r = ollama_chat(self.client, self.cfg["model"], messages, self.gen, self.ollama_cfg)
+            resposta = (r.message.content or "").strip()
+            tokens_in = getattr(r, "prompt_eval_count", None)
+            tokens_out = getattr(r, "eval_count", None)
+        else:
+            r = self.client.chat.completions.create(
+                model=self.cfg["model"], messages=messages,
+                temperature=self.gen["temperature"], max_tokens=self.gen["max_tokens"],
+            )
+            u = getattr(r, "usage", None)
+            resposta = (r.choices[0].message.content or "").strip()
+            tokens_in = getattr(u, "prompt_tokens", None)
+            tokens_out = getattr(u, "completion_tokens", None)
         return {
-            "resposta": (r.choices[0].message.content or "").strip(),
+            "resposta": resposta,
             "latencia_s": round(time.perf_counter() - t0, 3),
-            "tokens_in": getattr(u, "prompt_tokens", None),
-            "tokens_out": getattr(u, "completion_tokens", None),
+            "tokens_in": tokens_in,
+            "tokens_out": tokens_out,
         }

@@ -1,18 +1,20 @@
 """2) Indexação: chunks -> embeddings -> ChromaDB (data/chroma).
 
-Uso:  python src/index.py
+Uso:  python src/index.py [--pipeline baseline]
 """
+import argparse
 import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 
-from common import load_config, read_jsonl
+from common import load_config, pipeline_paths, read_jsonl, resolve_pipeline
 
 COLLECTION = "atas"
 
 
-def get_collection(cfg, reset=False):
-    client = chromadb.PersistentClient(path=cfg["paths"]["chroma_dir"])
-    emb = SentenceTransformerEmbeddingFunction(model_name=cfg["embeddings"]["model"])
+def get_collection(cfg, pipeline_name=None, reset=False):
+    name, _, resolved_cfg = resolve_pipeline(cfg, pipeline_name)
+    client = chromadb.PersistentClient(path=pipeline_paths(cfg, name)["chroma_dir"])
+    emb = SentenceTransformerEmbeddingFunction(model_name=resolved_cfg["embeddings"]["model"])
     if reset:
         try:
             client.delete_collection(COLLECTION)
@@ -23,9 +25,13 @@ def get_collection(cfg, reset=False):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--pipeline", help="Nome do pipeline definido em config.yaml")
+    args = ap.parse_args()
     cfg = load_config()
-    chunks = read_jsonl(cfg["paths"]["chunks"])
-    col = get_collection(cfg, reset=True)
+    pipeline_name, _, _ = resolve_pipeline(cfg, args.pipeline)
+    chunks = read_jsonl(pipeline_paths(cfg, pipeline_name)["chunks"])
+    col = get_collection(cfg, pipeline_name, reset=True)
     B = 64
     for i in range(0, len(chunks), B):
         lote = chunks[i:i + B]
