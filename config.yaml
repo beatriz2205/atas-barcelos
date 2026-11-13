@@ -70,6 +70,14 @@ pipelines:
     description: Baseline com os dez excertos semanticamente mais próximos.
     retrieval:
       top_k: 10
+  hybrid_baseline:
+    <<: *pipeline_defaults
+    description: Baseline com hybrid search (semantic + BM25) para melhorar recall de termos exatos.
+    retrieval:
+      top_k: 5
+      hybrid_weights:
+        semantic: 0.7
+        sparse: 0.3
   prompt_sem_fontes:
     <<: *pipeline_defaults
     description: Baseline sem obrigação de citar a ata no fim da resposta.

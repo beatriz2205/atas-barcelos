@@ -23,11 +23,18 @@ def build_system_prompt(prompt_cfg: dict) -> str:
 class Retriever:
     def __init__(self, cfg, pipeline_name=None):
         self.col = get_collection(cfg, pipeline_name)
-        _, _, resolved_cfg = resolve_pipeline(cfg, pipeline_name)
+        _, pipeline, resolved_cfg = resolve_pipeline(cfg, pipeline_name)
         self.k = resolved_cfg["retrieval"]["top_k"]
+        self.hybrid_weights = pipeline.get("retrieval", {}).get("hybrid_weights")
 
     def __call__(self, pergunta: str, k: int | None = None) -> list[dict]:
-        r = self.col.query(query_texts=[pergunta], n_results=k or self.k)
+        query_args = {"query_texts": [pergunta], "n_results": k or self.k}
+        
+        # Se for hybrid search, usa score_weights
+        if self.hybrid_weights:
+            query_args["score_weights"] = self.hybrid_weights
+        
+        r = self.col.query(**query_args)
         return [
             {"id": i, "text": d, "metadata": m, "distance": dist}
             for i, d, m, dist in zip(r["ids"][0], r["documents"][0], r["metadatas"][0], r["distances"][0])

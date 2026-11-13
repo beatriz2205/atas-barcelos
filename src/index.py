@@ -12,16 +12,29 @@ COLLECTION = "atas"
 
 
 def get_collection(cfg, pipeline_name=None, reset=False):
-    name, _, resolved_cfg = resolve_pipeline(cfg, pipeline_name)
+    name, pipeline, resolved_cfg = resolve_pipeline(cfg, pipeline_name)
     client = chromadb.PersistentClient(path=pipeline_paths(cfg, name)["chroma_dir"])
     emb = SentenceTransformerEmbeddingFunction(model_name=resolved_cfg["embeddings"]["model"])
+    
+    # Verifica se este pipeline usa hybrid search (semantic + sparse/BM25)
+    is_hybrid = pipeline.get("retrieval", {}).get("hybrid_weights") is not None
+    
     if reset:
         try:
             client.delete_collection(COLLECTION)
         except Exception:
             pass
-    return client.get_or_create_collection(COLLECTION, embedding_function=emb,
-                                           metadata={"hnsw:space": "cosine"})
+    
+    # Para hybrid search, ativa o sparse index (BM25)
+    collection_metadata = {"hnsw:space": "cosine"}
+    if is_hybrid:
+        collection_metadata["allow_sparse_index"] = True
+    
+    return client.get_or_create_collection(
+        COLLECTION, 
+        embedding_function=emb,
+        metadata=collection_metadata
+    )
 
 
 def main():
