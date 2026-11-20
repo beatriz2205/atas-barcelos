@@ -4,7 +4,7 @@ Objetivo: comparar vários LLMs a extrair informação das atas das reuniões de
 usando o **mesmo pipeline RAG** para todos e avaliando com **RAGAS** + métricas próprias.
 
 ```
-PDFs atas ──► OCRmyPDF ──► ingest.py ──► chunks.jsonl ──► index.py ──► ChromaDB (bge-m3)
+PDFs atas ──► OCRmyPDF ──► ingest.py ──► chunks.jsonl ──► index.py ──► ChromaDB (embeddinggemma)
                                                                │  top-k (igual p/ todos)
 questions.jsonl ──────────────────────────────► run.py ◄───────┘
                                                   │  modelo A, B, C... (API OpenAI-compatível)
@@ -22,7 +22,7 @@ questions.jsonl ─────────────────────�
 | `temperature = 0` | Respostas reprodutíveis. |
 | Prompt obriga a responder "não consta" quando não há informação | Permite medir alucinação de forma objetiva. |
 | Juiz RAGAS ≠ modelos avaliados | Evita que o juiz favoreça o próprio modelo. |
-| Embeddings multilingues (bge-m3) | As atas estão em português europeu. |
+| Embeddings multilingues (embeddinggemma, no servidor da universidade) | As atas estão em português europeu; o mesmo modelo indexa e pesquisa. |
 
 ## 2. Modelos selecionados
 
