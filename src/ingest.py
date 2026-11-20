@@ -175,8 +175,10 @@ def ler_pdf(path: Path) -> str:
 def aplicar_ocr(origem: Path, destino: Path, ocr_cfg: dict, refazer: bool = False) -> Path:
     """Cria (ou reutiliza) o PDF pesquisável produzido pelo OCRmyPDF.
 
-    ``--force-ocr`` é deliberado: garante que também PDFs com camada de texto
-    passam pelo mesmo processo antes de chegarem ao embedding/modelo.
+    ``force_ocr: true`` (predefinição dos pipelines) usa ``--force-ocr``: todas as
+    páginas passam por OCR, mesmo as que já têm texto, para que todas as atas
+    cheguem ao embedding/modelo pelo mesmo processo. ``force_ocr: false`` usa
+    ``--skip-text`` e só reconhece as páginas sem texto (ex.: atas digitalizadas).
     """
     if destino.exists() and not refazer:
         return destino
@@ -191,7 +193,8 @@ def aplicar_ocr(origem: Path, destino: Path, ocr_cfg: dict, refazer: bool = Fals
         # ``ocrmypdf`` recusa substituir o destino; este ficheiro é um cache
         # derivado do PDF de origem e só é removido com --refazer-ocr.
         destino.unlink()
-    cmd = [executavel, "--force-ocr", "--output-type", "pdf", "--language", ocr_cfg.get("language", "por")]
+    modo = "--force-ocr" if ocr_cfg.get("force_ocr", True) else "--skip-text"
+    cmd = [executavel, modo, "--output-type", "pdf", "--language", ocr_cfg.get("language", "por")]
     if ocr_cfg.get("rotate_pages", False):
         cmd.append("--rotate-pages")
     if ocr_cfg.get("deskew", False):

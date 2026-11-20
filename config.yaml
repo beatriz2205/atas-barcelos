@@ -22,6 +22,7 @@ ollama:
 pipeline_defaults: &pipeline_defaults
   ocr:
     language: por
+    force_ocr: true              # true: OCR a todas as páginas (indicação do professor); false: só às páginas sem texto
     rotate_pages: true
     deskew: false
     clean: false
@@ -30,7 +31,13 @@ pipeline_defaults: &pipeline_defaults
     max_chars: 1500              # ~350-400 tokens
     overlap_chars: 200
   embeddings:
-    model: BAAI/bge-m3
+    # Calculados no servidor Ollama (rápido). O EmbeddingGemma usa prefixos diferentes
+    # para perguntas e documentos. Alternativa local, no CPU (lenta):
+    #   provider: sentence_transformers, model: BAAI/bge-m3, sem prefixos.
+    provider: ollama
+    model: embeddinggemma:latest
+    query_prefix: "task: search result | query: "
+    document_prefix: "title: none | text: "
   retrieval:
     top_k: 5
   generation:
@@ -47,7 +54,7 @@ pipelines:
   # Referência: o pipeline RAG original, agora sempre com OCR antes da extração.
   baseline:
     <<: *pipeline_defaults
-    description: OCR com rotação, chunks por proposta, bge-m3, top-5 e prompt com fontes.
+    description: OCR com rotação, chunks por proposta, embeddinggemma, top-5 e prompt com fontes.
 
   # Cada variante altera apenas uma decisão, para conclusões interpretáveis.
   ocr_deskew:
@@ -55,6 +62,7 @@ pipelines:
     description: Baseline com correção de inclinação das páginas digitalizadas.
     ocr:
       language: por
+      force_ocr: true
       rotate_pages: true
       deskew: true
       clean: false
@@ -72,12 +80,38 @@ pipelines:
       top_k: 10
   hybrid_baseline:
     <<: *pipeline_defaults
-    description: Baseline com hybrid search (semantic + BM25) para melhorar recall de termos exatos.
+    description: Baseline com pesquisa híbrida (semântica + BM25 em português), fundida por RRF.
     retrieval:
       top_k: 5
-      hybrid_weights:
-        semantic: 0.7
-        sparse: 0.3
+      hybrid:
+        fusion: rrf              # funde pela posição: os scores do cosseno e do BM25 não são comparáveis
+        rrf_k: 60
+        bm25_language: portuguese  # stemming e palavras comuns ("aprovada"/"aprovação" -> "aprov")
+  hybrid_weighted:
+    <<: *pipeline_defaults
+    description: Pesquisa híbrida com soma ponderada dos scores normalizados (alternativa ao RRF).
+    retrieval:
+      top_k: 5
+      hybrid:
+        fusion: weighted
+        weights:
+          semantic: 0.7
+          sparse: 0.3
+        bm25_language: portuguese
+  rerank:
+    <<: *pipeline_defaults
+    description: Baseline com reranking dos 20 primeiros excertos por um cross-encoder multilingue.
+    retrieval:
+      top_k: 5
+      rerank:
+        model: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1   # local, CPU (~470 MB)
+        candidates: 20
+  filtro_data:
+    <<: *pipeline_defaults
+    description: Baseline que, quando a pergunta indica a data de uma reunião, pesquisa só nessa ata.
+    retrieval:
+      top_k: 5
+      date_filter: true
   prompt_sem_fontes:
     <<: *pipeline_defaults
     description: Baseline sem obrigação de citar a ata no fim da resposta.
