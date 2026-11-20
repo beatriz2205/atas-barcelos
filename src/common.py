@@ -63,15 +63,39 @@ def resolve_pipeline(cfg: dict, name: str | None = None) -> tuple[str, dict, dic
     return pipeline_name, pipeline, resolved
 
 
+def _dono_dos_artefactos(cfg: dict, pipeline_name: str, seccoes: tuple) -> str:
+    """Primeiro pipeline (pela ordem do config.yaml) com as mesmas `seccoes` que este.
+
+    Pipelines que só mudam a pesquisa ou o prompt (top_k, híbrida, filtro por data...)
+    produzem exatamente o mesmo OCR, chunks e índice; partilham por isso a pasta do
+    primeiro, em vez de repetirem o OCR (lento) e a indexação.
+    """
+    alvo = resolve_pipeline(cfg, pipeline_name)[2]
+    for nome in cfg.get("pipelines", {}):
+        outro = resolve_pipeline(cfg, nome)[2]
+        if all(outro[s] == alvo[s] for s in seccoes):
+            return nome
+    return pipeline_name
+
+
 def pipeline_paths(cfg: dict, pipeline_name: str) -> dict:
-    """Caminhos exclusivos de um pipeline, derivados de paths.pipelines_dir."""
-    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", pipeline_name)
-    base = Path(cfg["paths"]["pipelines_dir"]) / safe_name
+    """Caminhos dos artefactos de um pipeline, derivados de paths.pipelines_dir.
+
+    O OCR é partilhado entre pipelines com a mesma secção `ocr`; os chunks e o índice,
+    entre pipelines com as mesmas secções `ocr`, `chunking` e `embeddings`.
+    """
+    def pasta(nome):
+        return Path(cfg["paths"]["pipelines_dir"]) / re.sub(r"[^A-Za-z0-9_.-]+", "_", nome)
+
+    dono_ocr = _dono_dos_artefactos(cfg, pipeline_name, ("ocr",))
+    dono_indice = _dono_dos_artefactos(cfg, pipeline_name, ("ocr", "chunking", "embeddings"))
+    base = pasta(dono_indice)
     return {
         "base": str(base),
-        "ocr_dir": str(base / "ocr"),
+        "ocr_dir": str(pasta(dono_ocr) / "ocr"),
         "chunks": str(base / "chunks.jsonl"),
         "chroma_dir": str(base / "chroma"),
+        "partilhado_com": dono_indice if dono_indice != pipeline_name else None,
     }
 
 
@@ -105,6 +129,51 @@ def make_client(model_cfg: dict, ollama_cfg: dict | None = None):
     key_env = model_cfg.get("api_key_env")
     api_key = os.environ.get(key_env, "") if key_env else "not-needed"
     return OpenAI(base_url=model_cfg["base_url"], api_key=api_key or "not-needed")
+
+
+class Embedder:
+    """Calcula embeddings para indexação (documentos) e pesquisa (perguntas).
+
+    O mesmo objeto serve o index.py, o Retriever e o RAGAS, garantindo que se indexa
+    e pesquisa com o MESMO modelo. Fornecedores:
+      - ollama: modelo no servidor da universidade (ex.: embeddinggemma), com a chave do .env;
+      - sentence_transformers: modelo local no CPU (ex.: BAAI/bge-m3).
+    O EmbeddingGemma foi treinado com prefixos diferentes para perguntas e documentos;
+    `query_prefix` e `document_prefix` no config.yaml aplicam-nos.
+    """
+
+    def __init__(self, cfg: dict, batch_size: int = 32):
+        e = cfg["embeddings"]
+        self.provider = e.get("provider", "sentence_transformers")
+        self.model = e["model"]
+        self.query_prefix = e.get("query_prefix", "")
+        self.document_prefix = e.get("document_prefix", "")
+        self.batch_size = batch_size
+        if self.provider == "ollama":
+            self.client = make_client({}, cfg["ollama"])
+        elif self.provider == "sentence_transformers":
+            from sentence_transformers import SentenceTransformer
+
+            self.st = SentenceTransformer(self.model)
+        else:
+            raise ValueError(f"Fornecedor de embeddings desconhecido: {self.provider}")
+
+    def _embed(self, textos: list[str]) -> list[list[float]]:
+        if self.provider == "ollama":
+            out = []
+            for i in range(0, len(textos), self.batch_size):
+                # truncate=False: um texto acima do limite do modelo (2048 tokens no
+                # embeddinggemma) dá erro, em vez de ser cortado sem aviso.
+                out.extend(self.client.embed(model=self.model, input=textos[i:i + self.batch_size],
+                                             truncate=False).embeddings)
+            return [list(map(float, v)) for v in out]
+        return self.st.encode(textos, normalize_embeddings=True).tolist()
+
+    def embed_documents(self, textos: list[str]) -> list[list[float]]:
+        return self._embed([self.document_prefix + t for t in textos])
+
+    def embed_query(self, texto: str) -> list[float]:
+        return self._embed([self.query_prefix + texto])[0]
 
 
 def ollama_chat(client, model: str, messages: list[dict], generation: dict, ollama_cfg: dict):

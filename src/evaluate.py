@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from common import load_config, read_jsonl, resolve_pipeline
+from common import Embedder, load_config, read_jsonl, resolve_pipeline
 
 
 # ---------------------------------------------------------------- métricas próprias
@@ -73,7 +73,20 @@ def avaliar_ragas(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     from ragas.llms import LangchainLLMWrapper
     from ragas.metrics import (Faithfulness, FactualCorrectness, LLMContextPrecisionWithReference,
                                LLMContextRecall, ResponseRelevancy)
-    from langchain_huggingface import HuggingFaceEmbeddings
+    from langchain_core.embeddings import Embeddings
+
+    class EmbedderLangchain(Embeddings):
+        """Adapta o Embedder do projeto à interface do LangChain/RAGAS (ResponseRelevancy)."""
+
+        def __init__(self, embedder):
+            self.e = embedder
+
+        def embed_documents(self, texts):
+            # o ResponseRelevancy compara perguntas com perguntas: mesmo prefixo dos dois lados
+            return self.e._embed([self.e.query_prefix + t for t in texts])
+
+        def embed_query(self, text):
+            return self.e.embed_query(text)
 
     j = cfg["judge"]
     if cfg.get("ollama"):
@@ -105,9 +118,7 @@ def avaliar_ragas(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     alvo = df[df.apply(respondivel, axis=1) & (df["resposta"].str.len() > 0)]
     for (pipeline, modelo), sub in alvo.groupby(["pipeline", "modelo"]):
         _, _, pipeline_cfg = resolve_pipeline(cfg, pipeline)
-        emb = LangchainEmbeddingsWrapper(
-            HuggingFaceEmbeddings(model_name=pipeline_cfg["embeddings"]["model"])
-        )
+        emb = LangchainEmbeddingsWrapper(EmbedderLangchain(Embedder(pipeline_cfg)))
         ds = EvaluationDataset(samples=[
             SingleTurnSample(user_input=r.pergunta, response=r.resposta,
                              retrieved_contexts=list(r.contextos), reference=r.resposta_referencia)
