@@ -14,3 +14,15 @@ data/chroma/
 # Resultados
 outputs/*
 !outputs/.gitkeep
+
+# Artefactos por pipeline (OCR, chunks, índice)
+data/pipelines/
+
+# LaTeX (ficheiros gerados ao compilar o relatório)
+report/*.aux
+report/*.log
+report/*.out
+report/*.toc
+report/*.fls
+report/*.fdb_latexmk
+report/*.synctex.gz
