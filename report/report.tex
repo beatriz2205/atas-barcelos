@@ -4,7 +4,9 @@
 \usepackage[T1]{fontenc} % acentos em verbatim e < > corretos
 \usepackage{mathptmx}     % Times New Roman (texto e fórmulas)
 \usepackage{courier}      % Courier para código (vetorial, combina com a Times)
-\setlength{\emergencystretch}{2em} % evita linhas a passar a margem com nomes longos
+% Permite partir a linha a seguir a cada _ em nomes como \texttt{prompt\_sem\_fontes}
+\renewcommand{\_}{\textunderscore\allowbreak}
+\setlength{\emergencystretch}{3em} % evita linhas a passar a margem com nomes longos
 \usepackage[portuguese]{babel}
 \usepackage{booktabs}
 \usepackage{array}
@@ -104,7 +106,7 @@ O corpus é composto por 23 atas das reuniões da Câmara Municipal de Barcelos 
 Duas características do corpus condicionaram o desenho do pipeline:
 \begin{itemize}
     \item \textbf{Numeração repetida.} Como a numeração recomeça com o novo mandato, existem duas atas com cada um dos números 1 a 4. Por isso, as atas são identificadas pela data da reunião (AAAA-MM-DD), tanto nas perguntas (campo \texttt{ata\_fonte}) como nas métricas de recuperação.
-    \item \textbf{Ata digitalizada.} A ata n.º 5 (3 de março de 2025) é quase toda uma imagem digitalizada: só uma página tem texto extraível. É um dos motivos para o pipeline aplicar OCR antes da extração de texto (Secção~\ref{subsec:ocr}).
+    \item \textbf{Ata incompleta.} O PDF disponível da ata n.º 5 (3 de março de 2025) tem apenas uma página (a página 48 da ata), com o fim da proposta n.º 33 e o início da n.º 34. A ata fica no corpus, mas nenhuma pergunta depende dela.
 \end{itemize}
 
 \subsection{Extração de Metadados}
@@ -161,7 +163,7 @@ O pipeline segue uma arquitetura modular em quatro etapas:
 
 % --- Entradas (em cima) ---
 \node[data] (in1) at (0,2.6)    {PDFs das atas};
-\node[data] (in4) at (9.9,2.6)  {\texttt{questions.jsonl}};
+\node[data, text width=2.8cm] (in4) at (9.9,2.6)  {\texttt{questions.jsonl}};
 \node[data] (in5) at (13.2,2.6) {Modelo juiz\\ \texttt{gemma4:26b}\\ (RAGAS)};
 
 \draw[io] (in1) -- (p1);
@@ -184,7 +186,7 @@ O pipeline segue uma arquitetura modular em quatro etapas:
 \draw[io] (p5) -- (out5);
 
 \end{tikzpicture}%
-}
+}%
 \caption{Arquitetura do pipeline. As setas contínuas indicam a ordem de execução; as tracejadas, as entradas e os artefactos produzidos por cada etapa.}
 \label{fig:pipeline}
 \end{figure}
@@ -205,7 +207,7 @@ As decisões de desenho foram tomadas com o objetivo de isolar a variável em es
 \begin{tabular}{>{\raggedright\arraybackslash}p{7cm}>{\raggedright\arraybackslash}p{8cm}}
 \toprule
 \textbf{Decisão} & \textbf{Justificação} \\ \midrule
-OCR de todas as páginas (OCRmyPDF/Tesseract, português, com correção de rotação) & Todas as atas chegam à extração pelo mesmo processo, incluindo as digitalizadas; existe um modo seletivo (só páginas sem texto) como alternativa de eficiência (Secção~\ref{subsec:ocr}) \\ \midrule
+OCR só nas páginas sem texto (OCRmyPDF/Tesseract, português, com correção de rotação) & As páginas digitalizadas passam a ter texto; as restantes mantêm o texto original do PDF, que é exato e não está sujeito a erros de reconhecimento (Secção~\ref{subsec:ocr}) \\ \midrule
 Recuperação fixa partilhada por todos os modelos & Isola a variável em estudo: apenas o gerador muda, permitindo comparação justa entre modelos \\ \midrule
 \textit{Chunking} por ``PROPOSTA N.º X'' + janela de 1500 caracteres com sobreposição de 200 & Cada deliberação fica num \textit{chunk} coerente; evita misturar propostas diferentes no mesmo \textit{chunk} \\ \midrule
 Cabeçalho com metadados em cada \textit{chunk}: [Ata n.º X | tipo | data] & As atas usam datas por extenso; o cabeçalho torna perguntas por data/n.º de ata recuperáveis \\ \midrule
@@ -226,15 +228,12 @@ Extração de datas por extenso para formato ISO & Conversão automática de dat
 
 O OCR (OCRmyPDF com Tesseract, língua portuguesa) é aplicado antes da extração de texto, e o \texttt{ingest.py} implementa dois modos de operação:
 
-
 \begin{itemize}
-    \item \textbf{OCR total} (\texttt{force\_ocr: true}, configuração de referência): todas as páginas são rasterizadas e reconhecidas, incluindo as que já têm texto extraível. Todas as atas chegam assim ao modelo de \textit{embeddings} e aos LLMs exatamente pelo mesmo processo, eliminando uma fonte de heterogeneidade nos resultados.
-    \item \textbf{OCR seletivo} (\texttt{force\_ocr: false}): apenas as páginas sem texto extraível são reconhecidas, através da opção \texttt{-{}-skip-text} do OCRmyPDF. Este modo reduz drasticamente o tempo de processamento, pois limita o OCR às páginas que dele dependem (na prática, às atas digitalizadas, como a ata n.º~5 (Secção~\ref{sec:corpus})), mas aceita que as páginas com camada de texto sejam tratadas por um processo de extração distinto.
+    \item \textbf{OCR seletivo} (\texttt{force\_ocr: false}, configuração de referência): apenas as páginas sem texto extraível são reconhecidas, através da opção \texttt{-{}-skip-text} do OCRmyPDF; as restantes mantêm o texto original do PDF.
+    \item \textbf{OCR total} (\texttt{force\_ocr: true}): todas as páginas são rasterizadas e reconhecidas, incluindo as que já têm texto extraível.
 \end{itemize}
 
-A configuração de referência adota o OCR total, de modo a uniformizar o percurso de todas as atas e a eliminar a dependência da qualidade (por vezes incerta) da camada de texto embutida nos PDFs originais; o modo seletivo é uma alternativa de eficiência documentada, que poderá ser avaliada como ablação num passo futuro. Em ambos os modos, os PDFs reconhecidos são guardados em cache, pelo que o OCR só é feito uma vez por configuração.
-
-O OCR pode introduzir erros de reconhecimento, sobretudo em algarismos (valores, datas e números de proposta). O efeito do OCR na qualidade da recuperação e das respostas é, por isso, uma das variáveis a analisar.
+A configuração de referência adota o OCR seletivo. As 23 atas de 2025 são PDFs gerados digitalmente: na ingestão, o OCRmyPDF não encontrou nenhuma página sem texto, e a camada de texto embutida mostrou-se fiável, permitindo extrair corretamente o número, a data e o tipo de reunião de todas as atas. Nestas condições, o OCR total não traria qualquer ganho, já que o texto original é exato e o OCR pode, no máximo, igualá-lo. Pelo contrário, substituiria texto exato por texto reconhecido, sujeito a erros sobretudo em algarismos (valores, datas e números de proposta), que são precisamente o que muitas perguntas avaliam, e aumentaria o tempo de ingestão de poucos minutos para cerca de duas horas. Com o corpus atual, o OCR seletivo produz o mesmo texto que a extração direta; o passo fica preparado para atas digitalizadas, como os livros de atas de 1974 a 1977 do Arquivo Municipal. Em ambos os modos, os PDFs processados são guardados em cache, pelo que o OCR só é feito uma vez por configuração.
 
 \subsection{Recuperação de Excertos}
 \label{subsec:pesquisa}
@@ -275,11 +274,11 @@ Cada variante do Eixo 2 altera uma única decisão do pipeline de referência, p
 \centering
 \caption{Variantes do pipeline (Eixo 2), definidas em \texttt{config.yaml}}
 \label{tab:pipelines}
-\begin{tabular}{>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{4.8cm}>{\raggedright\arraybackslash}p{5.8cm}}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.6cm}>{\raggedright\arraybackslash}p{4.4cm}>{\raggedright\arraybackslash}p{5.8cm}}
 \toprule
 \textbf{Pipeline} & \textbf{Decisão em estudo} & \textbf{Alteração em relação ao \texttt{baseline}} \\ \midrule
-\texttt{baseline} & --- & Referência: OCR com correção de rotação, \textit{chunks} por proposta, embeddinggemma, top-5 e \textit{prompt} com citação de fontes \\ \midrule
-\texttt{ocr\_deskew} & Correção de inclinação no OCR & OCR com correção da inclinação das páginas \\ \midrule
+\texttt{baseline} & --- & Referência: OCR só nas páginas sem texto, com correção de rotação, \textit{chunks} por proposta, embeddinggemma, top-5 e \textit{prompt} com citação de fontes \\ \midrule
+\texttt{ocr\_deskew} & Correção de inclinação no OCR & Correção da inclinação das páginas digitalizadas no OCR \\ \midrule
 \texttt{chunks\_2500} & Tamanho dos \textit{chunks} & \textit{Chunks} de 2500 caracteres com sobreposição de 300 \\ \midrule
 \texttt{top\_k\_10} & Quantidade de contexto & 10 excertos em vez de 5 \\ \midrule
 \texttt{hybrid\_baseline} & Recuperação híbrida & Pesquisa híbrida (semântica + BM25 em português), fundida por RRF \\ \midrule
@@ -301,7 +300,7 @@ Para responder à RQ1, os modelos foram selecionados segundo três critérios: (
 \centering
 \caption{Modelos avaliados (Eixo 1), com o papel de cada um no estudo}
 \label{tab:modelos}
-\begin{tabular}{>{\raggedright\arraybackslash}p{3.4cm}>{\raggedright\arraybackslash}p{2.2cm}>{\raggedright\arraybackslash}p{5.2cm}>{\raggedright\arraybackslash}p{4.2cm}}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.3cm}>{\raggedright\arraybackslash}p{1.9cm}>{\raggedright\arraybackslash}p{4.9cm}>{\raggedright\arraybackslash}p{4.1cm}}
 \toprule
 \textbf{Modelo} & \textbf{Parâmetros} & \textbf{Origem} & \textbf{Papel no estudo} \\ \midrule
 Qwen~3~8B & 8B & Qwen 3, generalista multilingue & Referência generalista \cite{qwen3} \\ \midrule
@@ -359,7 +358,7 @@ Para complementar o RAGAS e validar os seus resultados, foram implementadas mét
 \centering
 \caption{Métricas determinísticas implementadas}
 \label{tab:metricas-proprias}
-\begin{tabular}{>{\raggedright\arraybackslash}p{3.5cm}>{\raggedright\arraybackslash}p{6.5cm}>{\raggedright\arraybackslash}p{4.5cm}}
+\begin{tabular}{>{\raggedright\arraybackslash}p{4cm}>{\raggedright\arraybackslash}p{6cm}>{\raggedright\arraybackslash}p{4.5cm}}
 \toprule
 \textbf{Métrica} & \textbf{Definição} & \textbf{Avalia} \\ \midrule
 \texttt{valores\_corretos} & Percentagem de \texttt{valores\_esperados} presentes na resposta & Precisão factual \\ \midrule
@@ -505,7 +504,7 @@ O módulo \texttt{rag.py} implementa o \texttt{Retriever}, recuperação semânt
 \section{Resultados Esperados e Análise Planeada}
 \label{sec:resultados}
 
-O \textit{pipeline} gera, na pasta \texttt{outputs/}: respostas brutas por
+{\sloppy O \textit{pipeline} gera, na pasta \texttt{outputs/}: respostas brutas por
 \textit{pipeline} e modelo
 (\texttt{answers\_\allowbreak<pipeline>\_\allowbreak\_\allowbreak<modelo>.\allowbreak jsonl});
 resultados por pergunta, com todas as métricas
@@ -513,7 +512,7 @@ resultados por pergunta, com todas as métricas
 e resumos agregados por modelo
 (\texttt{resumo\_\allowbreak por\_\allowbreak modelo.\allowbreak csv})
 e por tipo de pergunta
-(\texttt{resumo\_\allowbreak por\_\allowbreak tipo.\allowbreak csv}).
+(\texttt{resumo\_\allowbreak por\_\allowbreak tipo.\allowbreak csv}).\par}
 
 A análise dos resultados decorrerá das duas questões de investigação e ficará focada em:
 
@@ -533,7 +532,7 @@ A análise dos resultados decorrerá das duas questões de investigação e fica
 
 Este projeto construiu uma infraestrutura completa de avaliação de LLMs com RAG sobre documentação administrativa em português europeu: um corpus de 23 atas com metadados fiáveis; um pipeline modular de referência e oito variantes de ablação; seis modelos organizados em dois eixos de comparação controlada; um protocolo de avaliação que combina métricas RAGAS, julgadas por um modelo externo à amostra, com métricas determinísticas de precisão, alucinação e abstenção; e um conjunto inicial de 28 perguntas com respostas de referência confirmadas junto das fontes.
 
-O trabalho seguinte consiste em: concluir o OCR e a indexação do \texttt{baseline}; validar a recuperação (\texttt{check\_retrieval.py}) e comparar as variantes de recuperação; executar os seis modelos no \texttt{baseline} e avaliar os resultados; alargar o conjunto de perguntas até 40--60 (meta de $\geq$5 por categoria, com validação por dois membros do grupo); executar as restantes variantes do pipeline com o melhor modelo; e avaliar o OCR seletivo (\texttt{force\_ocr: false}) como ablação de eficiência (Secção~\ref{subsec:ocr}).
+A ingestão e a indexação do \texttt{baseline} estão concluídas (2443 \textit{chunks}), e a recuperação foi verificada com o \texttt{check\_retrieval.py} para as variantes de pesquisa. O trabalho seguinte consiste em: executar os seis modelos e avaliar os resultados; alargar o conjunto de perguntas até 40--60 (meta de $\geq$5 por categoria, com validação por dois membros do grupo); e executar as restantes variantes do pipeline com o melhor modelo.
 
 Os resultados experimentais e a respetiva discussão serão reportados numa versão subsequente deste documento.
 

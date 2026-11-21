@@ -139,9 +139,9 @@ Resultados em `outputs/`: `resumo_por_modelo.csv`, `resumo_por_tipo.csv`, `resul
 ### Pipelines RAG e comparação justa
 
 Um pipeline é a configuração RAG inteira: OCR, limpeza/chunking, embeddings,
-retrieval, geração e prompt. Todos os PDFs são processados pelo OCRmyPDF com
-`--force-ocr`, inclusive quando já contêm texto; portanto, é sempre texto OCR que
-chega aos embeddings e aos LLMs. Os PDFs OCR, chunks e índice ficam em
+retrieval, geração e prompt. Todos os PDFs passam pelo OCRmyPDF com `--skip-text`:
+só as páginas sem texto (digitalizadas) são reconhecidas por OCR; as restantes
+mantêm o texto original do PDF, que é exato. Os PDFs OCR, chunks e índice ficam em
 `data/pipelines/<pipeline>/`, impedindo reutilização acidental de artefactos.
 
 O `baseline` reproduz as decisões RAG originais, com OCR adicionado. As variantes

@@ -22,7 +22,7 @@ ollama:
 pipeline_defaults: &pipeline_defaults
   ocr:
     language: por
-    force_ocr: true              # true: OCR a todas as páginas (indicação do professor); false: só às páginas sem texto
+    force_ocr: false             # false: OCR só nas páginas sem texto; true: refaz o OCR de todas as páginas
     rotate_pages: true
     deskew: false
     clean: false
@@ -62,7 +62,7 @@ pipelines:
     description: Baseline com correção de inclinação das páginas digitalizadas.
     ocr:
       language: por
-      force_ocr: true
+      force_ocr: false
       rotate_pages: true
       deskew: true
       clean: false
