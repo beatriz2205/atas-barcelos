@@ -1,4 +1,4 @@
-\documentclass{article}
+\documentclass[11pt]{article}
 \usepackage{graphicx} % Required for inserting images
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc} % acentos em verbatim e < > corretos
@@ -9,20 +9,33 @@
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage{multirow}
+\usepackage{amsmath}
 \usepackage{geometry}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}   %
 \geometry{a4paper, margin=2.5cm}
-\usepackage{hyperref}
+\usepackage[hidelinks]{hyperref}
 
-\title{Bolsa Investigação - Centro Algoritmi\\ Avaliação de LLMs com RAG sobre as atas da Câmara Municipal de Barcelos}
+\title{Avaliação Comparativa de Modelos de Linguagem com RAG\\
+sobre as Atas da Câmara Municipal de Barcelos}
 \author{
-    Beatriz Miranda \\
-    Tiago Martins
+    Beatriz Miranda\\
+    Tiago Martins\\[4pt]
+    \small Centro Algoritmi -- Universidade do Minho\\
+    \small Bolsa de Investigação
 }
 \date{2026}
 
 \begin{document}
 
 \maketitle
+
+\begin{abstract}
+Este trabalho avalia comparativamente modelos de linguagem de grande dimensão (LLMs) na tarefa de resposta a perguntas sobre as atas das reuniões da Câmara Municipal de Barcelos, através de uma infraestrutura RAG (\textit{Retrieval-Augmented Generation}) padronizada. O desenho experimental assenta em dois eixos independentes: (i) com o pipeline fixo, comparam-se seis modelos abertos entre 8 e 14 mil milhões de parâmetros, incluindo um par da mesma família afinado por SFT e por DPO, o que permite isolar o efeito da estratégia de afinação; (ii) com o modelo fixo, variam-se decisões individuais do pipeline (OCR, \textit{chunking}, recuperação e \textit{prompt}), o que permite medir o contributo de cada decisão. A avaliação combina as métricas do framework RAGAS, julgadas por um modelo não pertencente à amostra, com métricas determinísticas próprias, orientadas à precisão factual e à abstenção correta. Este documento descreve o corpus, a metodologia, o protocolo de avaliação e a análise planeada; a execução experimental e o respetivo relato de resultados constituem a fase seguinte do projeto.
+\end{abstract}
+
+\noindent\textbf{Palavras-chave:} avaliação de LLMs; RAG; português europeu; documento oficial; RAGAS; recuperação de informação.
+
 \newpage
 
 \tableofcontents
@@ -31,27 +44,53 @@
 \section{Introdução}
 \label{sec:intro}
 
-Este relatório documenta o projeto de avaliação comparativa de modelos de linguagem (LLMs) para extração de informação das atas das reuniões da Câmara Municipal de Barcelos, utilizando um pipeline RAG (Retrieval-Augmented Generation) padronizado. O objetivo principal é comparar o desempenho de diferentes modelos na tarefa de responder a perguntas sobre as deliberações municipais.
+Os modelos de linguagem de grande dimensão (LLMs) têm vindo a assumir um papel central na extração e no questionamento de informação em conjuntos documentais. Contudo, a sua aplicação à documentação administrativa em português europeu, neste caso, as atas das reuniões da Câmara Municipal de Barcelos, levanta desafios específicos que este trabalho procura caracterizar e medir. Para tal, é construído um pipeline RAG (\textit{Retrieval-Augmented Generation}; \cite{lewis}) padronizado, que ancora as respostas dos modelos nos excertos pertinentes das atas, e é definido um protocolo de avaliação comparativa devidamente controlado.
 
-O estudo tem dois eixos de experiência independentes. No primeiro, fixa-se o pipeline RAG e varia-se apenas o modelo de geração, para comparar modelos. No segundo, fixa-se o modelo e varia-se uma decisão do pipeline de cada vez (OCR, chunking, pesquisa ou prompt), para medir o efeito de cada decisão.
+O objetivo é duplo. Por um lado, pretende-se determinar que modelos, numa gama de recursos moderada (8--14 mil milhões de parâmetros), respondem de forma mais fiel e completa a perguntas sobre as deliberações municipais. Por outro, pretende-se quantificar o efeito de cada decisão de desenho do pipeline, OCR, \textit{chunking}, recuperação e \textit{prompt},na qualidade das respostas.
+
+Este duplo objetivo é materializado em duas questões de investigação:
+
+
+\begin{description}
+    \item[RQ1.] Que diferenças de desempenho apresentam modelos abertos de 8--14B, (i) de famílias distintas e (ii) de uma mesma família afinada por SFT e por DPO, na resposta a perguntas sobre documentação administrativa em português europeu?
+    \item[RQ2.] Qual o efeito isolado de cada decisão do pipeline RAG (OCR, \textit{chunking}, estratégia de recuperação e \textit{prompt}) na qualidade da recuperação e das respostas?
+\end{description}
+
+As contribuições do projeto são:
+
+\begin{enumerate}
+    \item uma infraestrutura RAG modular e reutilizável, na qual cada decisão de desenho é explícita e configurável;
+    \item um desenho experimental de dois eixos (modelo e pipeline) que isola a variável em estudo em cada comparação;
+    \item um protocolo de avaliação que combina métricas RAGAS com métricas determinísticas próprias, incluindo medidas diretas de alucinação e de abstenção;
+    \item um conjunto de perguntas de avaliação, orientado ao domínio das atas municipais, com respostas de referência confirmadas junto das fontes.
+\end{enumerate}
 
 \subsection{Contexto e Motivação}
 
 As atas das reuniões de câmara contêm informação estruturada mas complexa, com:
 \begin{itemize}
-    \item Textos em português europeu com terminologia jurídica e administrativa
-    \item Datas escritas por extenso (ex: ``aos trinta dias do mês de janeiro de dois mil e vinte e cinco'')
-    \item Estrutura hierárquica: atas $\rightarrow$ propostas $\rightarrow$ deliberações
-    \item Informação distribuída por múltiplos documentos
+    \item textos em português europeu com terminologia jurídica e administrativa;
+    \item datas escritas por extenso (por exemplo, ``aos trinta dias do mês de janeiro de dois mil e vinte e cinco'');
+    \item estrutura hierárquica: atas $\rightarrow$ propostas $\rightarrow$ deliberações;
+    \item informação distribuída por múltiplos documentos.
 \end{itemize}
 
-A avaliação de LLMs neste contexto permite entender:
+A avaliação de LLMs neste contexto permite compreender:
 \begin{itemize}
-    \item Qual a capacidade de cada modelo lidar com português europeu administrativo
-    \item Como o tamanho do modelo afeta o desempenho em tarefas de extração
-    \item A eficácia de modelos genéricos vs. especializados em português
-    \item A resistência à alucinação face a perguntas sem resposta
+    \item a capacidade de cada modelo para lidar com o português europeu administrativo;
+    \item de que modo o tamanho do modelo afeta o desempenho em tarefas de extração;
+    \item a eficácia relativa de modelos generalistas e de modelos especializados em português;
+    \item a resistência à alucinação, face a perguntas sem resposta no corpus.
 \end{itemize}
+
+\section{Trabalho Relacionado}
+\label{sec:relacionado}
+
+O enquadramento metodológico do projeto apoia-se em três linhas de trabalho. Em primeiro lugar, a geração aumentada por recuperação \cite{lewis} e a recuperação densa de passagens \cite{dpr} estabelecem o paradigma em que um modelo gerador condiciona as suas respostas nos excertos recuperados de um índice de passagens. A recuperação léxica baseada em BM25 \cite{bm25} mantém-se complementar à recuperação semântica, sendo a sua fusão, nomeadamente por \textit{Reciprocal Rank Fusion} \cite{rrf}, uma prática corrente em sistemas RAG modernos; a normalização lexical das duas partes recorre a \textit{stemming}, para o qual o algoritmo Snowball \cite{snowball} é a implementação de referência para o português.
+
+Em segundo lugar, a avaliação de sistemas RAG tem sido sistematizada pelo framework RAGAS \cite{ragas}, que introduz métricas julgadas por LLM para a fidelidade e a relevância das respostas e para a qualidade dos contextos recuperados. Este projeto adota essas métricas e complementa-as com métricas determinísticas próprias, de modo a que os resultados não dependam exclusivamente de um juiz automatizado.
+
+Em terceiro lugar, a amostra de modelos avaliados acompanha o panorama recente de LLMs abertos multilingues: das famílias Qwen \cite{qwen3}, Phi \cite{phi4} e Gemma \cite{gemma3}, bem como o esforço emergente de especialização em português europeu, representado neste estudo pelos modelos Gervásio e AMALIA. A comparação controlada entre variantes de afinação da mesma família (SFT e DPO) segue a prática de estudos de ablação entre estratégias de alinhamento.
 
 \section{Corpus de Atas}
 \label{sec:corpus}
@@ -64,13 +103,13 @@ O corpus é composto por 23 atas das reuniões da Câmara Municipal de Barcelos 
 
 Duas características do corpus condicionaram o desenho do pipeline:
 \begin{itemize}
-    \item \textbf{Numeração repetida.} Como a numeração recomeça com o novo mandato, existem duas atas com cada um dos números 1 a 4. Por isso, as atas são identificadas pela data da reunião (AAAA-MM-DD), tanto nas perguntas (campo \texttt{ata\_fonte}) como na métrica de recuperação.
+    \item \textbf{Numeração repetida.} Como a numeração recomeça com o novo mandato, existem duas atas com cada um dos números 1 a 4. Por isso, as atas são identificadas pela data da reunião (AAAA-MM-DD), tanto nas perguntas (campo \texttt{ata\_fonte}) como nas métricas de recuperação.
     \item \textbf{Ata digitalizada.} A ata n.º 5 (3 de março de 2025) é quase toda uma imagem digitalizada: só uma página tem texto extraível. É um dos motivos para o pipeline aplicar OCR antes da extração de texto (Secção~\ref{subsec:ocr}).
 \end{itemize}
 
 \subsection{Extração de Metadados}
 
-O número, a data e o tipo de cada reunião são extraídos do título da ata (\textit{``Ata n.º X da Reunião Ordinária \ldots{} realizada em \ldots''}). A extração exigiu tratar três particularidades:
+O número, a data e o tipo de cada reunião são extraídos do título da ata (\textit{``Ata n.º X da Reunião Ordinária \ldots{} realizada em \ldots''}). A extração teve de atender a três particularidades:
 \begin{itemize}
     \item o número da ata aparece numa linha isolada no PDF e seria removido pela limpeza de números de página, pelo que os metadados são lidos do texto antes da limpeza;
     \item a posição do título no texto extraído depende do extrator (o PyMuPDF coloca-o depois do primeiro parágrafo), pelo que o título é procurado e não assumido no início;
@@ -78,26 +117,81 @@ O número, a data e o tipo de cada reunião são extraídos do título da ata (\
 \end{itemize}
 Quando o título não é legível, os metadados são obtidos do nome do ficheiro.
 
-\section{Arquitetura do Pipeline RAG}
-\label{sec:pipeline}
+\section{Metodologia}
+\label{sec:metodologia}
 
 \subsection{Visão Geral}
 
 O pipeline segue uma arquitetura modular em quatro etapas:
 
-\begin{center}
-\begin{tabular}{c}
-\toprule
-PDFs das atas $\rightarrow$ OCR $\rightarrow$ ingest.py $\rightarrow$ chunks.jsonl \\
-$\rightarrow$ index.py $\rightarrow$ ChromaDB (embeddinggemma) \\
-$\downarrow$ \textit{top-k excertos, iguais para todos os modelos} \\
-questions.jsonl $\rightarrow$ run.py $\rightarrow$ answers\_<pipeline>\_\_<modelo>.jsonl \\
-$\downarrow$ \\
-evaluate.py $\rightarrow$ CSVs (resultados) \\ \bottomrule
-\end{tabular}
-\end{center}
 
-Cada pipeline é uma configuração RAG completa, definida no ficheiro \texttt{config.yaml} com as secções OCR, chunking, embeddings, pesquisa, geração e prompt. Os modelos ficam fora desta estrutura, o que permite fixar um deles e variar apenas o pipeline.
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    font=\footnotesize,
+    >=Stealth,
+    proc/.style={rectangle, rounded corners=3pt, draw=blue!60!black, fill=blue!8,
+                 thick, minimum width=2.7cm, minimum height=2.2cm,
+                 align=center, text width=2.5cm},
+    data/.style={rectangle, draw=gray!70, fill=gray!10,
+                 minimum width=2.7cm, minimum height=0.9cm,
+                 align=center, text width=2.5cm, font=\scriptsize},
+    flow/.style={->, thick, blue!60!black},
+    io/.style={->, dashed, gray!70},
+]
+
+% --- Etapas (linha central) ---
+\node[proc] (p1) at (0,0)    {\textbf{1. Ingestão}\\[2pt]\texttt{ingest.py}\\[2pt]
+                              {\scriptsize OCR + \textit{chunking}}};
+\node[proc] (p2) at (3.3,0)  {\textbf{2. Indexação}\\[2pt]\texttt{index.py}};
+\node[proc] (p3) at (6.6,0)  {\textbf{3. Verificação da recuperação}\\[2pt]
+                              \texttt{check\_}\\
+                              \texttt{retrieval.py}\\[2pt]
+                              {\scriptsize\itshape sem LLM}};
+\node[proc] (p4) at (9.9,0)  {\textbf{4. Geração}\\[2pt]\texttt{run.py}\\[2pt]
+                              {\scriptsize\itshape top-$k$ excertos\\ iguais para\\
+                              todos os modelos}};
+\node[proc] (p5) at (13.2,0) {\textbf{5. Avaliação}\\[2pt]\texttt{evaluate.py}};
+
+\draw[flow] (p1) -- (p2);
+\draw[flow] (p2) -- (p3);
+\draw[flow] (p3) -- (p4);
+\draw[flow] (p4) -- (p5);
+
+% --- Entradas (em cima) ---
+\node[data] (in1) at (0,2.6)    {PDFs das atas};
+\node[data] (in4) at (9.9,2.6)  {\texttt{questions.jsonl}};
+\node[data] (in5) at (13.2,2.6) {Modelo juiz\\ \texttt{gemma4:26b}\\ (RAGAS)};
+
+\draw[io] (in1) -- (p1);
+\draw[io] (in4) -- (p4);
+\draw[io] (in5) -- (p5);
+
+% --- Saídas (em baixo) ---
+\node[data] (out1a) at (0,-2.6)   {\texttt{chunks.jsonl}};
+\node[data] (out1b) at (0,-3.9)   {PDFs pesquisáveis\\ (cache do OCR)};
+\node[data] (out2)  at (3.3,-2.6) {ChromaDB\\ (\textit{embeddinggemma})};
+\node[data] (out4)  at (9.9,-2.6) {\texttt{answers\_}\\
+                                   \texttt{\textless{}pipeline\textgreater{}\_\_}\\
+                                   \texttt{\textless{}modelo\textgreater{}.jsonl}};
+\node[data] (out5)  at (13.2,-2.6) {CSVs de resultados};
+
+\draw[io] (p1) -- (out1a);
+\draw[io] (out1a) -- (out1b);
+\draw[io] (p2) -- (out2);
+\draw[io] (p4) -- (out4);
+\draw[io] (p5) -- (out5);
+
+\end{tikzpicture}%
+}
+\caption{Arquitetura do pipeline. As setas contínuas indicam a ordem de execução; as tracejadas, as entradas e os artefactos produzidos por cada etapa.}
+\label{fig:pipeline}
+\end{figure}
+
+
+
+Cada pipeline é uma configuração RAG completa, definida no ficheiro \texttt{config.yaml} com as secções OCR, \textit{chunking}, \textit{embeddings}, recuperação, geração e \textit{prompt}. Os modelos ficam fora desta estrutura, o que permite fixar um deles e variar apenas o pipeline (Secção~\ref{subsec:variantes}).
 
 \subsection{Decisões de Desenho}
 \label{subsec:decisoes}
@@ -111,96 +205,133 @@ As decisões de desenho foram tomadas com o objetivo de isolar a variável em es
 \begin{tabular}{>{\raggedright\arraybackslash}p{7cm}>{\raggedright\arraybackslash}p{8cm}}
 \toprule
 \textbf{Decisão} & \textbf{Justificação} \\ \midrule
-OCR de todas as páginas (OCRmyPDF/Tesseract, português, com correção de rotação) & Todas as atas chegam à extração pelo mesmo processo, incluindo as digitalizadas \\ \midrule
+OCR de todas as páginas (OCRmyPDF/Tesseract, português, com correção de rotação) & Todas as atas chegam à extração pelo mesmo processo, incluindo as digitalizadas; existe um modo seletivo (só páginas sem texto) como alternativa de eficiência (Secção~\ref{subsec:ocr}) \\ \midrule
 Recuperação fixa partilhada por todos os modelos & Isola a variável em estudo: apenas o gerador muda, permitindo comparação justa entre modelos \\ \midrule
-Chunking por ``PROPOSTA N.º X'' + janela de 1500 caracteres com sobreposição de 200 & Cada deliberação fica num chunk coerente; evita misturar propostas diferentes no mesmo chunk \\ \midrule
-Cabeçalho com metadados em cada chunk: [Ata n.º X | tipo | data] & As atas usam datas por extenso; o cabeçalho torna perguntas por data/n.º de ata recuperáveis \\ \midrule
+\textit{Chunking} por ``PROPOSTA N.º X'' + janela de 1500 caracteres com sobreposição de 200 & Cada deliberação fica num \textit{chunk} coerente; evita misturar propostas diferentes no mesmo \textit{chunk} \\ \midrule
+Cabeçalho com metadados em cada \textit{chunk}: [Ata n.º X | tipo | data] & As atas usam datas por extenso; o cabeçalho torna perguntas por data/n.º de ata recuperáveis \\ \midrule
 Atas identificadas pela data da reunião, e não pelo número & A numeração recomeça em cada mandato (Secção~\ref{sec:corpus}) \\ \midrule
-Embeddings multilingues: embeddinggemma (servidor Ollama da universidade), com prefixos distintos para perguntas e documentos & Modelo multilingue treinado para pesquisa, disponível na infraestrutura da universidade; o mesmo modelo é usado para indexar e pesquisar \\ \midrule
+\textit{Embeddings} multilingues: embeddinggemma (servidor Ollama da universidade), com prefixos distintos para perguntas e documentos & Modelo multilingue treinado para pesquisa, disponível na infraestrutura da universidade; o mesmo modelo é usado para indexar e pesquisar \\ \midrule
 Top-k = 5 para todos os modelos & Recuperação idêntica para todos, eliminando variabilidade \\ \midrule
-temperature = 0 & Respostas determinísticas e reprodutíveis \\ \midrule
-Prompt obriga a responder ``A informação não consta das atas fornecidas.'' quando não há informação & Permite medir alucinação de forma objetiva e determinística \\ \midrule
-Orquestrador/juiz RAGAS separado dos modelos avaliados (Gemma 4, 26B) & Evita que o juiz favoreça o próprio modelo, com capacidade superior e custo razoável \\ \midrule
+\texttt{temperature} = 0 & Respostas determinísticas e reprodutíveis \\ \midrule
+\textit{Prompt} obriga a responder ``A informação não consta das atas fornecidas.'' quando não há informação & Permite medir alucinação de forma objetiva e determinística \\ \midrule
+Orquestrador/juiz RAGAS separado dos modelos avaliados (Gemma, 26B) & Evita que o juiz favoreça o próprio modelo; capacidade superior aos geradores, custo moderado (Secção~\ref{subsec:juiz}) \\ \midrule
 Limpeza de texto: remoção de tracejados, números de página, hifenização & Normalização do texto extraído dos PDFs \\ \midrule
 Extração de datas por extenso para formato ISO & Conversão automática de datas como ``trinta e um de março de dois mil e vinte e cinco'' para ``2025-03-31'' \\ \bottomrule
 \end{tabular}
 \end{table}
+\newpage 
 
 \subsection{OCR}
 \label{subsec:ocr}
 
-Todas as atas passam por OCR (OCRmyPDF com Tesseract, língua portuguesa) antes da extração de texto, incluindo as páginas que já têm texto, que são rasterizadas e reconhecidas de novo. Assim, todas as atas chegam ao modelo de embeddings e aos LLMs pelo mesmo processo. Os PDFs reconhecidos são guardados em cache, pelo que o OCR só é feito uma vez por configuração.
+O OCR (OCRmyPDF com Tesseract, língua portuguesa) é aplicado antes da extração de texto, e o \texttt{ingest.py} implementa dois modos de operação:
+
+
+\begin{itemize}
+    \item \textbf{OCR total} (\texttt{force\_ocr: true}, configuração de referência): todas as páginas são rasterizadas e reconhecidas, incluindo as que já têm texto extraível. Todas as atas chegam assim ao modelo de \textit{embeddings} e aos LLMs exatamente pelo mesmo processo, eliminando uma fonte de heterogeneidade nos resultados.
+    \item \textbf{OCR seletivo} (\texttt{force\_ocr: false}): apenas as páginas sem texto extraível são reconhecidas, através da opção \texttt{-{}-skip-text} do OCRmyPDF. Este modo reduz drasticamente o tempo de processamento, pois limita o OCR às páginas que dele dependem (na prática, às atas digitalizadas, como a ata n.º~5 (Secção~\ref{sec:corpus})), mas aceita que as páginas com camada de texto sejam tratadas por um processo de extração distinto.
+\end{itemize}
+
+A configuração de referência adota o OCR total, de modo a uniformizar o percurso de todas as atas e a eliminar a dependência da qualidade (por vezes incerta) da camada de texto embutida nos PDFs originais; o modo seletivo é uma alternativa de eficiência documentada, que poderá ser avaliada como ablação num passo futuro. Em ambos os modos, os PDFs reconhecidos são guardados em cache, pelo que o OCR só é feito uma vez por configuração.
 
 O OCR pode introduzir erros de reconhecimento, sobretudo em algarismos (valores, datas e números de proposta). O efeito do OCR na qualidade da recuperação e das respostas é, por isso, uma das variáveis a analisar.
 
-\subsection{Pesquisa}
+\subsection{Recuperação de Excertos}
 \label{subsec:pesquisa}
 
-O pipeline de referência usa pesquisa semântica: a pergunta é convertida num embedding e o ChromaDB devolve os 5 excertos mais próximos pela semelhança do cosseno. As variantes de pesquisa (Secção~\ref{sec:pipelines}) acrescentam:
-\begin{itemize}
-    \item \textbf{Pesquisa híbrida.} A pesquisa semântica capta sinónimos e paráfrases, mas falha em nomes próprios, códigos e termos raros, onde a pesquisa por palavras-chave (BM25) funciona melhor. O BM25 é calculado em português, com redução das palavras à raiz (\textit{stemming} Snowball: ``aprovada'', ``aprovação'' e ``aprovar'' $\rightarrow$ ``aprov'') e sem palavras comuns. As duas listas são fundidas por \textit{Reciprocal Rank Fusion}, $\mathrm{score}(d) = \sum 1/(60 + \mathrm{posição}(d))$, que combina as posições e não os scores, já que os scores do cosseno e do BM25 não são comparáveis. Uma variante alternativa usa a soma ponderada dos scores normalizados (0,7 semântico e 0,3 BM25).
-    \item \textbf{Filtro por data.} A pesquisa vetorial não é adequada a valores exatos como datas. Quando a pergunta indica a data de uma reunião existente no corpus, a pesquisa é restringida aos excertos dessa ata, através de um filtro sobre os metadados. Datas sem reunião correspondente (por exemplo, em perguntas com premissas falsas) são ignoradas.
-    \item \textbf{Reranking.} Recuperam-se os 20 excertos mais próximos e um \textit{cross-encoder} multilingue (\texttt{mmarco-\allowbreak mMiniLMv2}), que lê a pergunta e o excerto em conjunto, reordena-os, ficando os 5 melhores.
-\end{itemize}
+O pipeline de referência usa recuperação semântica: a pergunta é convertida num \textit{embedding} e o ChromaDB devolve os top-k excertos mais próximos pela semelhança do cosseno (top-5 para o pipeline de comparação dos modelos). Para responder à RQ2, foram definidas variantes de recuperação (Secção~\ref{subsec:variantes}), descritas de seguida.
 
-\section{Seleção dos Modelos}
-\label{sec:modelos}
 
-\subsection{Critérios de Seleção}
-
-Os modelos foram selecionados para comparar o desempenho de diferentes famílias e estratégias de afinação numa gama de tamanho semelhante. Esta abordagem permite:
 
 \begin{itemize}
-    \item Avaliar se diferentes famílias de modelos, com tamanhos comparáveis, apresentam desempenhos distintos no domínio das atas municipais
-    \item Identificar quais os modelos que melhor lidam com o português europeu administrativo
-    \item Comparar modelos abertos disponíveis no servidor da universidade
-    \item Isolar o efeito da estratégia de afinação dentro da mesma família e escala
+    \item \textbf{Pesquisa híbrida.} A recuperação semântica capta sinónimos e paráfrases, mas falha em nomes próprios, códigos e termos raros, em que a pesquisa por palavras-chave (BM25; \cite{bm25}) funciona melhor. O BM25 é aplicado após uma normalização lexical das duas partes (excertos e pergunta), composta por quatro etapas: conversão para minúsculas; remoção de acentos (que torna a pesquisa insensível a variações de acentuação entre o texto reconhecido por OCR e a pergunta); remoção de palavras comuns do português (\textit{stopwords}); e redução das palavras à raiz por \textit{stemming} Snowball em português \cite{snowball}. Dois conjuntos de exemplos ilustram a aproximação lexical assim obtida: 
+    \begin{itemize}
+    \item ``aprovada'', ``aprovação'' e ``aprovar'' reduzem ao mesmo \textit{token}: ``aprov'';
+    \item ``contratar'', ``contrato'', ``contratação'' e ``contratos'' convergem para ``contrat''.
 \end{itemize}
 
-\subsection{Modelos a Avaliar}
+\noindent Uma pesquisa por qualquer destas formas recupera, por isso, excertos que contêm qualquer uma das restantes. As duas listas de resultados são fundidas por \textit{Reciprocal Rank Fusion} \cite{rrf}, $\mathrm{score}(d) = \sum 1/(60 + \mathrm{posição}(d))$, que combina as posições e não os valores, já que os do cosseno e do BM25 não são comparáveis. Uma variante alternativa usa a soma ponderada dos valores normalizados (0,7 semântico e 0,3 BM25). A normalização lexical aplica-se apenas ao ramo léxico do \textit{pipeline}; o ramo semântico opera sobre o texto original, para que o modelo de \textit{embeddings} capte as variações que o \textit{stemming} agressivo poderia perder.
+    \item \textbf{Filtro por data.} A recuperação vetorial não é adequada a valores exatos como datas. Quando a pergunta indica a data de uma reunião existente no corpus, a pesquisa é restringida aos excertos dessa ata, através de um filtro sobre os metadados. Datas sem reunião correspondente (por exemplo, em perguntas com premissas falsas) são ignoradas.
+    \item \textbf{Reranking.} Recuperam-se os 20 excertos mais próximos e um \textit{cross-encoder} multilingue (\texttt{mmarco-\allowbreak mMiniLMv2}), que lê a pergunta e o excerto em conjunto e os reordena, ficando-se com os 5 melhores.
+\end{itemize}
 
-Foram selecionados seis modelos entre 8 e 14 mil milhões de parâmetros, todos disponíveis na infraestrutura da universidade: Qwen~3~8B, Gervásio~8B PT-PT, AMALIA 0626 SFT~9B, AMALIA 0626 DPO~9B, Phi-4~14B e Ministral~3~14B. Esta é a gama compacta disponível mais próxima de 10B; o único par da mesma família é deliberado e permite uma comparação controlada entre estratégias de afinação.
+\subsection{Geração e \textit{Prompt}}
 
-Qwen funciona como referência generalista e Gervásio testa especialização em português europeu. AMALIA SFT e DPO permitem avaliar o efeito da estratégia de afinação mantendo a família e a escala constantes. Phi-4 e Ministral são comparados entre si na mesma escala de 14B. Os resultados serão sempre apresentados com o número de parâmetros: não se atribuirá uma diferença entre 8B e 14B apenas à família do modelo. Os identificadores exatos, endpoint e método de autenticação estão registados em \texttt{config.yaml}; cada membro usa a sua chave local \texttt{OLLAMA\_TOKEN}, que não é versionada.
+As respostas são geradas com \texttt{temperature} = 0, para reprodutibilidade, e um \textit{prompt} de sistema que impõe três regras: responder apenas com base nos excertos fornecidos; responder ``A informação não consta das atas fornecidas.'' quando não há informação; e indicar as fontes no formato (Ata n.º X, AAAA-MM-DD), em português europeu. A imposição da citação da ata de origem permite às métricas determinísticas (Secção~\ref{sec:avaliacao}) verificar a correspondência entre a resposta e a ata correta; a variante \texttt{prompt\_sem\_fontes} remove esta exigência, para medir o seu efeito.
 
-\subsection{Orquestrador e Modelo Juiz}
+\subsection{Desenho Experimental: Variantes do Pipeline}
+\label{subsec:variantes}
 
-O modelo \texttt{gemma4:26b} foi escolhido como orquestrador/juiz das métricas RAGAS. Tem 26B parâmetros, acima dos geradores de 8--14B, e não pertence à amostra avaliada. Desta forma, reduz-se o risco de auto-favorecimento sem recorrer ao custo de um modelo de 119B.
+O desenho experimental organiza-se em dois eixos independentes, de modo que, em cada comparação, apenas uma variável muda:
 
-Neste projeto, ``orquestrador'' significa o avaliador que coordena o julgamento das respostas nas métricas RAGAS; não responde às perguntas do conjunto experimental. As respostas medidas são sempre produzidas apenas pelos seis modelos selecionados.
+\begin{description}
+    \item[Eixo 1 --- modelos.] O pipeline é fixo (o \texttt{baseline}) e comparam-se os seis modelos da Secção~\ref{subsec:modelos}; as diferenças observadas são atribuídas ao gerador (RQ1).
+    \item[Eixo 2 --- pipelines.] O modelo é fixo (o melhor avaliado no Eixo) e varia, de cada vez, uma única decisão do pipeline; as diferenças observadas são atribuídas a essa decisão (RQ2).
+\end{description}
 
-\section{Variantes do Pipeline}
-\label{sec:pipelines}
-
-Cada variante altera uma única decisão do pipeline de referência, para que as diferenças observadas sejam atribuíveis a essa decisão:
+Cada variante do Eixo 2 altera uma única decisão do pipeline de referência, para que a diferença observada seja atribuível a essa decisão:
 
 \begin{table}[h!]
 \centering
-\caption{Pipelines definidos em \texttt{config.yaml}}
+\caption{Variantes do pipeline (Eixo 2), definidas em \texttt{config.yaml}}
 \label{tab:pipelines}
-\begin{tabular}{>{\raggedright\arraybackslash}p{3.5cm}>{\raggedright\arraybackslash}p{11cm}}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{4.8cm}>{\raggedright\arraybackslash}p{5.8cm}}
 \toprule
-\textbf{Pipeline} & \textbf{Alteração em relação ao \texttt{baseline}} \\ \midrule
-baseline & Referência: OCR com correção de rotação, chunks por proposta, embeddinggemma, top-5 e prompt com citação de fontes \\ \midrule
-ocr\_deskew & OCR com correção da inclinação das páginas \\ \midrule
-chunks\_2500 & Chunks de 2500 caracteres com sobreposição de 300 \\ \midrule
-top\_k\_10 & 10 excertos em vez de 5 \\ \midrule
-hybrid\_baseline & Pesquisa híbrida (semântica + BM25 em português), fundida por RRF \\ \midrule
-hybrid\_weighted & Pesquisa híbrida com soma ponderada dos scores (0,7/0,3) \\ \midrule
-rerank & Reranking dos 20 primeiros excertos por um \textit{cross-encoder} multilingue \\ \midrule
-filtro\_data & Filtro pela data da reunião, quando a pergunta a indica \\ \midrule
-prompt\_sem\_fontes & Prompt sem obrigação de citar a ata no fim da resposta \\ \bottomrule
+\textbf{Pipeline} & \textbf{Decisão em estudo} & \textbf{Alteração em relação ao \texttt{baseline}} \\ \midrule
+\texttt{baseline} & --- & Referência: OCR com correção de rotação, \textit{chunks} por proposta, embeddinggemma, top-5 e \textit{prompt} com citação de fontes \\ \midrule
+\texttt{ocr\_deskew} & Correção de inclinação no OCR & OCR com correção da inclinação das páginas \\ \midrule
+\texttt{chunks\_2500} & Tamanho dos \textit{chunks} & \textit{Chunks} de 2500 caracteres com sobreposição de 300 \\ \midrule
+\texttt{top\_k\_10} & Quantidade de contexto & 10 excertos em vez de 5 \\ \midrule
+\texttt{hybrid\_baseline} & Recuperação híbrida & Pesquisa híbrida (semântica + BM25 em português), fundida por RRF \\ \midrule
+\texttt{hybrid\_weighted} & Método de fusão & Pesquisa híbrida com soma ponderada dos valores (0,7/0,3) \\ \midrule
+\texttt{rerank} & Ordenação dos excertos & \textit{Reranking} dos 20 primeiros excertos por um \textit{cross-encoder} multilingue \\ \midrule
+\texttt{filtro\_data} & Restrição do escopo & Filtro pela data da reunião, quando a pergunta a indica \\ \midrule
+\texttt{prompt\_sem\_fontes} & Exigência de citação & \textit{Prompt} sem obrigação de citar a ata no final da resposta \\ \bottomrule
 \end{tabular}
 \end{table}
 
-Os pipelines que só alteram a pesquisa ou o prompt produzem o mesmo OCR, os mesmos chunks e o mesmo índice que o \texttt{baseline}, pelo que reutilizam esses artefactos. Apenas \texttt{ocr\_deskew} e \texttt{chunks\_2500} exigem OCR ou indexação próprios.
+As variantes que só alteram a recuperação ou o \textit{prompt} produzem o mesmo OCR, os mesmos \textit{chunks} e o mesmo índice que o \texttt{baseline}, pelo que reutilizam esses artefactos. Apenas \texttt{ocr\_deskew} e \texttt{chunks\_2500} exigem OCR ou indexação próprios.
 
-\section{Métricas de Avaliação}
-\label{sec:metricas}
+\subsection{Modelos Avaliados}
+\label{subsec:modelos}
+
+Para responder à RQ1, os modelos foram selecionados segundo três critérios: (i) gama de parâmetros de 8--14\,B, que constitui o compromisso exequível entre capacidade e latência na infraestrutura disponível; (ii) disponibilidade de modelos abertos no servidor Ollama da universidade; e (iii) variedade de famílias e de estratégias de afinação, de modo a permitir tanto comparações entre famílias como uma comparação controlada dentro de uma mesma família.
+
+\begin{table}[h!]
+\centering
+\caption{Modelos avaliados (Eixo 1), com o papel de cada um no estudo}
+\label{tab:modelos}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.4cm}>{\raggedright\arraybackslash}p{2.2cm}>{\raggedright\arraybackslash}p{5.2cm}>{\raggedright\arraybackslash}p{4.2cm}}
+\toprule
+\textbf{Modelo} & \textbf{Parâmetros} & \textbf{Origem} & \textbf{Papel no estudo} \\ \midrule
+Qwen~3~8B & 8B & Qwen 3, generalista multilingue & Referência generalista \cite{qwen3} \\ \midrule
+Gervásio~8B PT-PT & 8B & Modelo aberto afiado em português europeu (GGUF, Q4\_K\_M) & Efeito da especialização em PT-PT, à mesma escala \\ \midrule
+AMALIA 0626 SFT~9B & 9B & Família AMALIA, afiada por SFT & Par controlado com a variante DPO (mesma família e escala) \\ \midrule
+AMALIA 0626 DPO~9B & 9B & Família AMALIA, afiada por DPO & Comparação SFT vs.\ DPO (estratégia de alinhamento) \\ \midrule
+Phi-4~14B & 14B & Microsoft & Primeiro par de 14B \\ \midrule
+Ministral~3~14B & 14B & Mistral AI & Segundo par de 14B \\ \bottomrule
+\end{tabular}
+\end{table}
+
+A composição da amostra permite três comparações controladas: entre famílias à mesma escala (os dois pares, de 8--9B e de 14B); entre especialização em português e generalismo (Gervásio vs.\ Qwen~3); e dentro da mesma família, entre estratégias de afinação (AMALIA SFT vs.\ DPO) --- esta última é a única comparação em que família, escala e ascendente de treino se mantêm constantes, pelo que a diferença observada é diretamente atribuível à estratégia de alinhamento.
+
+Os resultados serão sempre discutidos com o número de parâmetros em conta: as diferenças entre 8B e 14B não serão atribuídas apenas à família do modelo. 
+
+Registe-se uma limitação: o Gervásio é avaliado numa versão quantizada para GGUF (Q4\_K\_M, $\approx$4 bits), enquanto os restantes modelos correm em pesos completos. Parte de eventuais diferenças face ao Qwen~3, de que é descendente, poderá decorrer da quantização e não apenas da especialização em português. O \textit{endpoint} e o método de autenticação estão registados em \texttt{config.yaml};
+
+\subsection{Orquestrador e Modelo Juiz}
+\label{subsec:juiz}
+
+O modelo \texttt{gemma4:26b} (família Gemma; \cite{gemma3}) foi escolhido como orquestrador/juiz das métricas RAGAS. Tem 26B parâmetros, acima dos geradores de 8--14B --- como é exigível, para que o juiz avalie modelos comparáveis ou inferiores em capacidade --- e não pertence à amostra avaliada. 
+
+Neste projeto, ``orquestrador'' significa o avaliador que coordena o julgamento das respostas nas métricas RAGAS; não responde às perguntas do conjunto experimental. As respostas medidas são sempre produzidas pelos seis modelos da Secção~\ref{subsec:modelos}.
+
+\section{Protocolo de Avaliação}
+\label{sec:avaliacao}
 
 \subsection{Métricas RAGAS}
 
-O framework RAGAS (Retrieval-Augmented Generation Assessment) fornece métricas baseadas em LLM-juiz para avaliar tanto a recuperação como a geração:
+O framework RAGAS (\textit{Retrieval-Augmented Generation Assessment}; \cite{ragas}) fornece métricas baseadas em LLM-juiz para avaliar tanto a recuperação como a geração:
 
 \begin{table}[h!]
 \centering
@@ -209,34 +340,35 @@ O framework RAGAS (Retrieval-Augmented Generation Assessment) fornece métricas 
 \begin{tabular}{>{\raggedright\arraybackslash}p{6cm}>{\raggedright\arraybackslash}p{5cm}>{\raggedright\arraybackslash}p{3cm}}
 \toprule
 \textbf{Métrica} & \textbf{O que mede} & \textbf{Componente} \\ \midrule
-faithfulness & A resposta é suportada pelos excertos? (anti-alucinação) & Geração \\ \midrule
-answer\_relevancy & A resposta responde mesmo à pergunta? & Geração \\ \midrule
-factual\_correctness & Afirmações da resposta vs. referência (F1) & Geração \\ \midrule
-llm\_context\_precision\_\allowbreak with\_reference & Os excertos úteis aparecem no topo? & Recuperação \\ \midrule
-context\_recall & Os excertos cobrem a informação da referência? & Recuperação \\ \bottomrule
+\texttt{faithfulness} & A resposta é suportada pelos excertos? (anti-alucinação) & Geração \\ \midrule
+\texttt{answer\_relevancy} & A resposta responde à pergunta? & Geração \\ \midrule
+\texttt{factual\_correctness} & Afirmações da resposta vs.\ referência (F1) & Geração \\ \midrule
+\texttt{llm\_context\_precision\_\allowbreak with\_reference} & Os excertos úteis aparecem no topo? & Recuperação \\ \midrule
+\texttt{context\_recall} & Os excertos cobrem a informação da referência? & Recuperação \\ \bottomrule
 \end{tabular}
 \end{table}
 
-A métrica answer\_relevancy compara embeddings, calculados com o mesmo modelo usado na pesquisa (embeddinggemma).
+A métrica \texttt{answer\_relevancy} compara \textit{embeddings}, calculados com o mesmo modelo usado na recuperação (embeddinggemma).
 
-\subsection{Métricas Próprias (Determinísticas)}
+\subsection{Métricas Determinísticas}
 
 Para complementar o RAGAS e validar os seus resultados, foram implementadas métricas determinísticas que não dependem de um juiz LLM:
 
+
 \begin{table}[h!]
 \centering
-\caption{Métricas próprias implementadas}
+\caption{Métricas determinísticas implementadas}
 \label{tab:metricas-proprias}
 \begin{tabular}{>{\raggedright\arraybackslash}p{3.5cm}>{\raggedright\arraybackslash}p{6.5cm}>{\raggedright\arraybackslash}p{4.5cm}}
 \toprule
 \textbf{Métrica} & \textbf{Definição} & \textbf{Avalia} \\ \midrule
-valores\_corretos & Percentagem de valores\_esperados presentes na resposta & Precisão factual \\ \midrule
-abstencao\_correta & Respondeu quando havia resposta / recusou quando não havia & Comportamento adequado \\ \midrule
-alucinacao & Respondeu a uma pergunta sem resposta nas atas (deveria recusar) & Medida direta de alucinação \\ \midrule
-falsa\_recusa & Disse ``não consta'' quando a resposta estava disponível & Sub-utilização do contexto \\ \midrule
-retrieval\_hit@k & Alguma das atas corretas (identificadas pela data) está nos top-k excertos & Qualidade da recuperação \\ \midrule
-latencia\_s & Tempo de resposta em segundos & Eficiência \\ \midrule
-tokens\_out & Número de tokens gerados & Verbosidade/custo \\ \bottomrule
+\texttt{valores\_corretos} & Percentagem de \texttt{valores\_esperados} presentes na resposta & Precisão factual \\ \midrule
+\texttt{abstencao\_correta} & Respondeu quando havia resposta / recusou quando não havia & Comportamento adequado \\ \midrule
+\texttt{alucinacao} & Respondeu a uma pergunta sem resposta nas atas (deveria recusar) & Medida direta de alucinação \\ \midrule
+\texttt{falsa\_recusa} & Disse ``não consta'' quando a resposta estava disponível & Sub-utilização do contexto \\ \midrule
+\texttt{retrieval\_hit@k} & Alguma das atas corretas (identificadas pela data) está nos top-k excertos & Qualidade da recuperação \\ \midrule
+\texttt{latencia\_s} & Tempo de resposta em segundos & Eficiência \\ \midrule
+\texttt{tokens\_out} & Número de valores gerados & Verbosidade/custo \\ \bottomrule
 \end{tabular}
 \end{table}
 
@@ -244,21 +376,22 @@ Uma pergunta é considerada sem resposta quando a sua resposta de referência é
 
 \subsection{Importância das Métricas de Recuperação}
 
-Na maior parte dos sistemas RAG, os erros têm origem na pesquisa: se o excerto certo não é recuperado, nenhum modelo consegue responder corretamente. Por isso, a recuperação é avaliada antes da geração, com o script \texttt{check\_retrieval.py}, que mede, para cada pipeline e sem chamar nenhum LLM, o hit@k (alguma ata certa nos top-k) e o recall@k (fração das atas certas recuperadas, relevante nas perguntas multi\_ata), por tipo de pergunta.
+Na maior parte dos sistemas RAG, os erros têm origem na recuperação: se o excerto certo não é recuperado, nenhum modelo consegue responder corretamente. Por isso, a recuperação é avaliada antes da geração, com o script \texttt{check\_retrieval.py}, que mede, para cada pipeline e sem invocar nenhum LLM, o \textit{hit@k} (a ata certa nos top-k) e o \textit{recall@k} (fração das atas certas recuperadas, relevante nas perguntas multi\_ata), por tipo de pergunta.
 
-Como a recuperação é idêntica para todos os modelos dentro de um pipeline, as métricas de contexto (context\_precision, context\_recall, retrieval\_hit@k) devem produzir resultados aproximadamente iguais entre modelos. Servem para:
+Como a recuperação é idêntica para todos os modelos dentro de um pipeline, as métricas de contexto (\texttt{context\_precision}, \texttt{context\_recall}, \texttt{retrieval\_hit@k}) devem produzir resultados aproximadamente iguais entre modelos. Servem para:
 \begin{itemize}
-    \item Demonstrar que os erros vêm da geração e não da pesquisa
-    \item Comparar as variantes de pesquisa (Secção~\ref{sec:pipelines})
-    \item Validar que o pipeline de recuperação está a funcionar corretamente
+    \item demonstrar que os erros vêm da geração e não da recuperação;
+    \item comparar as variantes de recuperação (Secção~\ref{subsec:variantes}), no Eixo 2;
+    \item validar que o mecanismo de recuperação está a funcionar corretamente.
 \end{itemize}
 
 \section{Conjunto de Perguntas}
 \label{sec:perguntas}
 
-\subsection{Categorias de Perguntas}
+\subsection{Categorias}
 
 Foram definidos 8 tipos principais de perguntas, cada um testando capacidades específicas dos modelos:
+
 
 \begin{table}[h!]
 \centering
@@ -267,68 +400,69 @@ Foram definidos 8 tipos principais de perguntas, cada um testando capacidades es
 \begin{tabular}{>{\raggedright\arraybackslash}p{4cm}>{\raggedright\arraybackslash}p{5cm}>{\raggedright\arraybackslash}p{4cm}}
 \toprule
 \textbf{Tipo} & \textbf{Exemplo} & \textbf{O que testa} \\ \midrule
-factual\_simples & Data da reunião da ata n.º 7 & Extração direta de factos \\ \midrule
-votacao & Foi aprovada por unanimidade? Quem votou contra? & Interpretação de resultados de votação \\ \midrule
-numerico & Valor do apoio à associação X & Precisão em números e valores monetários \\ \midrule
-entidades & Com que entidades foi assinado o protocolo? & Identificação de nomes de pessoas/entidades \\ \midrule
-temporal & Quando foi aprovado pela 1.ª vez X? & Raciocínio sobre datas e cronologia \\ \midrule
-multi\_ata & Em quantas reuniões se discutiu X? & Agregação de informação de várias atas \\ \midrule
-sintese & Resume as deliberações da reunião X & Capacidade de síntese e resumo fiel \\ \midrule
-sem\_resposta & Orçamento do ``aeroporto de Barcelos'' & Resistência à alucinação \\ \bottomrule
+\texttt{factual\_simples} & Data da reunião da ata n.º 7 & Extração direta de factos \\ \midrule
+\texttt{votacao} & Foi aprovada por unanimidade? Quem votou contra? & Interpretação de resultados de votação \\ \midrule
+\texttt{numerico} & Valor do apoio à associação X & Precisão em números e valores monetários \\ \midrule
+\texttt{entidades} & Com que entidades foi assinado o protocolo? & Identificação de nomes de pessoas/entidades \\ \midrule
+\texttt{temporal} & Quando foi aprovado pela 1.ª vez X? & Raciocínio sobre datas e cronologia \\ \midrule
+\texttt{multi\_ata} & Em quantas reuniões se discutiu X? & Agregação de informação de várias atas \\ \midrule
+\texttt{sintese} & Resume as deliberações da reunião X & Capacidade de síntese e resumo fiel \\ \midrule
+\texttt{sem\_resposta} & Orçamento do ``aeroporto de Barcelos'' & Resistência à alucinação \\ \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Perguntas Adicionais para Robustez}
+\subsection{Perguntas de Robustez}
 
-Para além dos 8 tipos principais, foram adicionadas categorias para testar a robustez dos modelos face a:
-
+Para além dos 8 tipos principais, foram definidas categorias para testar a robustez dos modelos face a:
 \begin{itemize}
-    \item \textbf{ruido\_reformulacao}: Perguntas com formulação alternativa mas mesmo conteúdo
-    \item \textbf{resposta\_com\_justificacao}: Perguntas que exigem justificação da resposta
-    \item \textbf{resistencia\_a\_premissa\_falsa}: Perguntas com premissas incorretas que o modelo deve corrigir
-    \item \textbf{resistencia\_a\_entidade\_inexistente}: Perguntas sobre entidades que não existem nas atas
-    \item \textbf{contradicao\_temporal}: Perguntas com informação temporal contraditória
-    \item \textbf{resistencia\_a\_instrucao}: Perguntas que tentam forçar o modelo a ignorar as atas
-    \item \textbf{resistencia\_a\_informacao\_injetada}: Perguntas com informação que o modelo deve verificar nas atas
-    \item \textbf{distincao\_documental}: Perguntas que exigem distinção entre tipos de reunião (ordinária vs. extraordinária)
-    \item \textbf{abstencao\_alucinacao}: Perguntas vagas onde o modelo deve recusar responder
-    \item \textbf{resposta\_limitada\_a\_fonte}: Perguntas ambíguas onde o modelo deve pedir clarificação
+    \item \texttt{ruido\_reformulacao}: perguntas com formulação alternativa mas o mesmo conteúdo;
+    \item \texttt{resposta\_com\_justificacao}: perguntas que exigem justificação da resposta;
+    \item \texttt{resistencia\_a\_premissa\_falsa}: perguntas com premissas incorretas que o modelo deve corrigir;
+    \item \texttt{resistencia\_a\_entidade\_inexistente}: perguntas sobre entidades que não existem nas atas;
+    \item \texttt{contradicao\_temporal}: perguntas com informação temporal contraditória;
+    \item \texttt{resistencia\_a\_instrucao}: perguntas que tentam forçar o modelo a ignorar as atas;
+    \item \texttt{resistencia\_a\_informacao\_injetada}: perguntas com informação que o modelo deve verificar nas atas;
+    \item \texttt{distincao\_documental}: perguntas que exigem distinção entre tipos de reunião (ordinária vs.\ extraordinária);
+    \item \texttt{abstencao\_alucinacao}: perguntas vagas em que o modelo deve recusar responder;
+    \item \texttt{resposta\_limitada\_a\_fonte}: perguntas ambíguas em que o modelo deve pedir clarificação.
 \end{itemize}
 
-\subsection{Implementação Atual}
+\subsection{Estado Atual}
 
-Atualmente, o ficheiro questions.jsonl contém \textbf{28 perguntas} distribuídas por:
+O ficheiro \texttt{questions.jsonl} contém atualmente \textbf{28 perguntas} distribuídas por:
 \begin{itemize}
-    \item 3 perguntas factual\_simples (dificuldade: fácil)
-    \item 2 perguntas votacao (dificuldade: média)
-    \item 2 perguntas numerico (dificuldade: média/difícil)
-    \item 2 perguntas entidades (dificuldade: média)
-    \item 1 pergunta temporal (dificuldade: difícil)
-    \item 3 perguntas multi\_ata (dificuldade: difícil)
-    \item 1 pergunta sintese (dificuldade: média)
-    \item 4 perguntas sem\_resposta (dificuldade: média/difícil)
-    \item 10 perguntas de robustez, uma por categoria (vários níveis de dificuldade)
+    \item 3 perguntas \texttt{factual\_simples};
+    \item 2 perguntas \texttt{votacao};
+    \item 2 perguntas \texttt{numerico};
+    \item 2 perguntas \texttt{entidades};
+    \item 1 pergunta \texttt{temporal};
+    \item 3 perguntas \texttt{multi\_ata};
+    \item 1 pergunta \texttt{sintese};
+    \item 4 perguntas \texttt{sem\_resposta};
+    \item 10 perguntas de robustez, uma por categoria.
 \end{itemize}
 
 As respostas de referência foram escritas a partir do texto das atas e cada uma foi confirmada na ata de origem. Das 28 perguntas, 8 têm como resposta correta a recusa ou um pedido de clarificação.
 
 \subsection{Estrutura dos Dados}
 
-Cada pergunta no ficheiro questions.jsonl contém os seguintes campos:
+Cada pergunta no ficheiro \texttt{questions.jsonl} contém os seguintes campos:
 \begin{itemize}
-    \item \textbf{id}: Identificador único (ex: Q01, Q02, ...)
-    \item \textbf{tipo}: Categoria da pergunta
-    \item \textbf{dificuldade}: Nível de dificuldade (facil, media, dificil)
-    \item \textbf{pergunta}: Texto da pergunta
-    \item \textbf{resposta\_referencia}: Resposta correta escrita manualmente a partir das atas
-    \item \textbf{valores\_esperados}: Lista de valores que devem estar presentes na resposta
-    \item \textbf{ata\_fonte}: Lista de datas (AAAA-MM-DD) das atas que contêm a informação
+    \item \textbf{id}: identificador único (ex.: Q01, Q02, \ldots);
+    \item \textbf{tipo}: categoria da pergunta;
+    \item \textbf{pergunta}: texto da pergunta;
+    \item \textbf{resposta\_referencia}: resposta correta escrita manualmente a partir das atas;
+    \item \textbf{valores\_esperados}: lista de valores que devem estar presentes na resposta;
+    \item \textbf{ata\_fonte}: lista de datas (AAAA-MM-DD) das atas que contêm a informação.
 \end{itemize}
 
-\section{Implementação Técnica}
+\section{Implementação e Reprodutibilidade}
 \label{sec:implementacao}
 
-\subsection{Estrutura do Projeto}
+A implementação é modular e integralmente re-executável; esta secção descreve a estrutura e o fluxo que garantem que qualquer membro do grupo obtém os mesmos artefactos a partir dos mesmos comandos. Os passos de instalação e execução detalhados estão no Apêndice~\ref{sec:execucao}.
+
+\subsection{Estrutura e Fluxo}
+
 
 \begin{verbatim}
 atas-barcelos/
@@ -352,7 +486,7 @@ atas-barcelos/
 |   |-- check_retrieval.py   # Verifica a recuperação (sem LLM)
 |   |-- run.py               # Execução dos modelos
 |   `-- evaluate.py          # Avaliação dos resultados
-|-- report/                  # Este relatório
+|-- report/                  # Este documento
 `-- outputs/                 # Resultados
     |-- answers_<pipeline>__<modelo>.jsonl
     |-- resultados_por_pergunta.csv
@@ -360,171 +494,129 @@ atas-barcelos/
     `-- resumo_por_tipo.csv
 \end{verbatim}
 
-\subsection{Fluxo de Execução}
+O fluxo executa-se por ordem: (1) ingestão (\texttt{ingest.py}), OCR com cache, extração e limpeza de texto, metadados e \textit{chunking} por ``PROPOSTA N.º X''; (2) indexação (\texttt{index.py}), \textit{embeddings} com embeddinggemma no servidor Ollama e índice ChromaDB persistente em disco, com o modelo de \textit{embeddings} registado nos metadados (o \texttt{Retriever} recusa um índice feito com outro modelo); (3) verificação da recuperação (\texttt{check\_retrieval.py}), \textit{hit@k} e \textit{recall@k} por tipo de pergunta, sem LLM; (4) execução (\texttt{run.py}), para cada pergunta, a recuperação dos excertos é feita uma única vez e partilhada por todos os modelos, e cada modelo gera a resposta com esse contexto; (5) avaliação (\texttt{evaluate.py}), métricas determinísticas, (opcionalmente) RAGAS com LLM-juiz, e CSVs agregados por pipeline, modelo e tipo de pergunta.
 
-\begin{enumerate}
-    \item \textbf{Ingestão} (ingest.py):
-    \begin{itemize}
-        \item OCR dos PDFs das atas, com cache dos PDFs reconhecidos
-        \item Extração e limpeza de texto
-        \item Identificação de metadados (número, data, tipo de reunião)
-        \item Chunking por ``PROPOSTA N.º X''
-        \item Gravação em data/pipelines/<pipeline>/chunks.jsonl
-    \end{itemize}
+\subsection{Particularidades da Implementação}
 
-    \item \textbf{Indexação} (index.py):
-    \begin{itemize}
-        \item Carregamento dos chunks
-        \item Geração de embeddings com embeddinggemma, no servidor Ollama
-        \item Criação do índice vetorial em ChromaDB, com o modelo de embeddings registado nos metadados
-        \item Persistência em data/pipelines/<pipeline>/chroma/
-    \end{itemize}
+O \texttt{ingest.py} utiliza o PyMuPDF para extração dos PDFs reconhecidos e trata as particularidades das atas de Barcelos: linhas de tracejado usadas para preencher espaço; datas por extenso, convertidas para formato ISO (AAAA-MM-DD); deliberações organizadas por ``PROPOSTA N.º X''. Aplica, ainda, a limpeza de texto já descrita (Secção~\ref{subsec:decisoes}).
 
-    \item \textbf{Verificação da recuperação} (check\_retrieval.py): hit@k e recall@k por tipo de pergunta, sem chamar nenhum LLM.
+O módulo \texttt{rag.py} implementa o \texttt{Retriever}, recuperação semântica, pesquisa híbrida com normalização lexical, filtro por data e \textit{reranking} (Secção~\ref{subsec:pesquisa}), e o \texttt{Generator}, que envia a pergunta e os excertos ao modelo pelo cliente Ollama autenticado, com repetição automática em caso de \textit{timeout}. A avaliação (\texttt{evaluate.py}) normaliza o texto para comparação (remove acentos, normaliza números) e deteta automaticamente recusas e pedidos de clarificação com base em padrões.
 
-    \item \textbf{Execução} (run.py):
-    \begin{itemize}
-        \item Para cada pergunta, recuperação dos excertos (uma vez, partilhada por todos os modelos)
-        \item Para cada modelo, geração da resposta com o contexto recuperado
-        \item Gravação das respostas em answers\_<pipeline>\_\_<modelo>.jsonl
-    \end{itemize}
+\section{Resultados Esperados e Análise Planeada}
+\label{sec:resultados}
 
-    \item \textbf{Avaliação} (evaluate.py):
-    \begin{itemize}
-        \item Cálculo das métricas próprias (determinísticas)
-        \item (Opcional) Cálculo das métricas RAGAS com LLM-juiz
-        \item Geração de CSVs com resultados agregados por pipeline e modelo
-    \end{itemize}
-\end{enumerate}
+O \textit{pipeline} gera, na pasta \texttt{outputs/}: respostas brutas por
+\textit{pipeline} e modelo
+(\texttt{answers\_\allowbreak<pipeline>\_\allowbreak\_\allowbreak<modelo>.\allowbreak jsonl});
+resultados por pergunta, com todas as métricas
+(\texttt{resultados\_\allowbreak por\_\allowbreak pergunta.\allowbreak csv});
+e resumos agregados por modelo
+(\texttt{resumo\_\allowbreak por\_\allowbreak modelo.\allowbreak csv})
+e por tipo de pergunta
+(\texttt{resumo\_\allowbreak por\_\allowbreak tipo.\allowbreak csv}).
 
-\subsection{Detalhes de Implementação}
+A análise dos resultados decorrerá das duas questões de investigação e ficará focada em:
 
-\paragraph{Ingestão (ingest.py)}
 \begin{itemize}
-    \item Aplica OCR com OCRmyPDF (Tesseract, português, correção de rotação)
-    \item Utiliza PyMuPDF para extração de texto dos PDFs reconhecidos
-    \item Trata particularidades das atas de Barcelos:
-    \begin{itemize}
-        \item Linhas de tracejado para preencher espaço
-        \item Datas escritas por extenso
-        \item Capitular na primeira letra
-        \item Deliberações organizadas em ``PROPOSTA N.º X''
-    \end{itemize}
-    \item Converte datas por extenso para formato ISO (AAAA-MM-DD)
-    \item Aplica limpeza: remove tracejados, números de página, normaliza espaços
+    \item \textbf{RQ1} --- tabela comparativa por modelo, com todas as métricas; gráficos por tipo de pergunta, para identificar pontos fortes e limitações de cada modelo; exemplos de erros típicos, em particular na comparação AMALIA SFT vs.\ DPO e na comparação generalista vs.\ especializada em português;
+    \item \textbf{RQ2} --- comparação das variantes do pipeline, primeiro apenas na recuperação (com \texttt{check\allowbreak\_retrieval.py}) e depois \textit{ponta-a-ponta} com o melhor modelo; correlação entre \texttt{faithfulness} (RAGAS) e \texttt{valores\_corretos} (determinística), para validar o juiz LLM;
+    \item \textbf{custo-benefício} --- compromisso entre qualidade (\texttt{faithfulness}, \texttt{valores\_corretos}) e eficiência (\texttt{latencia\_s}, \texttt{tokens\_out}).
 \end{itemize}
 
-\paragraph{Indexação (index.py)}
-\begin{itemize}
-    \item Utiliza ChromaDB como base de dados vetorial, embebida na aplicação
-    \item Embeddings gerados no servidor Ollama da universidade (embeddinggemma, 768 dimensões), com o prefixo de documento recomendado para o modelo
-    \item Índice persistente em disco, partilhado entre pipelines com o mesmo OCR, chunking e embeddings
-    \item Medida de semelhança: cosseno
-\end{itemize}
+\section{Resultados obtidos}
 
-\paragraph{RAG (rag.py)}
-\begin{itemize}
-    \item \textbf{Retriever}: calcula o embedding da pergunta com o mesmo modelo usado na indexação (e recusa um índice feito com outro modelo) e devolve os top-k excertos; suporta pesquisa híbrida, filtro por data e reranking (Secção~\ref{subsec:pesquisa})
-    \item \textbf{Generator}: envia a pergunta e os excertos ao modelo através do cliente Ollama autenticado, com repetição automática em caso de timeout
-    \item \textbf{Prompt de sistema}: instruções para:
-    \begin{itemize}
-        \item Responder apenas com base nos excertos
-        \item Usar ``A informação não consta das atas fornecidas.'' quando não há informação
-        \item Responder em português europeu
-        \item Indicar fontes no formato (Ata n.º X, AAAA-MM-DD)
-    \end{itemize}
-\end{itemize}
+\section{Discussão dos resultados}
 
-\paragraph{Avaliação (evaluate.py)}
-\begin{itemize}
-    \item Normalização de texto para comparação (remove acentos, normaliza números)
-    \item Deteção automática de recusa e de pedidos de clarificação com base em padrões
-    \item Cálculo de todas as métricas para cada pipeline x modelo x pergunta
-    \item Agregação por pipeline, modelo e tipo de pergunta
-    \item Exportação para CSV com pandas
-\end{itemize}
 
-\section{Executar o Pipeline}
+\section{Considerações Finais}
+\label{sec:conclusoes}
+
+Este projeto construiu uma infraestrutura completa de avaliação de LLMs com RAG sobre documentação administrativa em português europeu: um corpus de 23 atas com metadados fiáveis; um pipeline modular de referência e oito variantes de ablação; seis modelos organizados em dois eixos de comparação controlada; um protocolo de avaliação que combina métricas RAGAS, julgadas por um modelo externo à amostra, com métricas determinísticas de precisão, alucinação e abstenção; e um conjunto inicial de 28 perguntas com respostas de referência confirmadas junto das fontes.
+
+O trabalho seguinte consiste em: concluir o OCR e a indexação do \texttt{baseline}; validar a recuperação (\texttt{check\_retrieval.py}) e comparar as variantes de recuperação; executar os seis modelos no \texttt{baseline} e avaliar os resultados; alargar o conjunto de perguntas até 40--60 (meta de $\geq$5 por categoria, com validação por dois membros do grupo); executar as restantes variantes do pipeline com o melhor modelo; e avaliar o OCR seletivo (\texttt{force\_ocr: false}) como ablação de eficiência (Secção~\ref{subsec:ocr}).
+
+Os resultados experimentais e a respetiva discussão serão reportados numa versão subsequente deste documento.
+
+\appendix
+
+\section{Execução do Pipeline}
 \label{sec:execucao}
 
 \subsection{Pré-requisitos}
 
-O pipeline usa Python 3.11 e o Tesseract com a língua portuguesa:
+O pipeline usa Python 3.10 (versão do ambiente de desenvolvimento atual) ou superior, e o Tesseract com a língua portuguesa:
 \begin{verbatim}
 sudo apt install ocrmypdf tesseract-ocr-por
-conda create -n atas python=3.11 -y
+conda create -n atas python=3.10 -y
 conda activate atas
 pip install -r requirements.txt
 \end{verbatim}
 
-Os modelos (geradores, juiz e embeddings) estão no servidor Ollama da universidade e não precisam de ser descarregados. Cada membro copia \texttt{.env.example} para \texttt{.env} e coloca a sua chave em \texttt{OLLAMA\_TOKEN}. O acesso verifica-se com \texttt{python src/check\_ollama.py}.
+Os modelos (geradores, juiz e \textit{embeddings}) estão no servidor Ollama da universidade e não precisam de ser descarregados. Cada membro copia \texttt{.env.example} para \texttt{.env} e coloca a sua chave em \texttt{OLLAMA\_TOKEN}. O acesso verifica-se com \texttt{python src/check\_ollama.py}.
 
-\subsection{Passos de Execução}
+\subsection{Passos}
 
 Os scripts aceitam \texttt{--pipeline <nome>}; sem esta opção, usam o \texttt{baseline}.
 
 \begin{enumerate}
-    \item Colocar os PDFs das atas em data/atas/
-    \item Executar OCR e ingestão: python src/ingest.py
-    \item Verificar o output para confirmar a extração correta de números e datas
-    \item Executar indexação: python src/index.py
-    \item Verificar a recuperação, sem LLM: python src/check\_retrieval.py
-    \item Testar com limite: python src/run.py --limit 5
-    \item Executar completo: python src/run.py
-    \item Avaliar sem RAGAS (rápido): python src/evaluate.py --sem-ragas
-    \item Avaliar com RAGAS (lento): python src/evaluate.py
+    \item Colocar os PDFs das atas em \texttt{data/atas/};
+    \item executar OCR e ingestão: \texttt{python src/ingest.py};
+    \item verificar o \textit{output} para confirmar a extração correta de números e datas;
+    \item executar a indexação: \texttt{python src/index.py};
+    \item verificar a recuperação, sem LLM: \texttt{python src/check\_retrieval.py};
+    \item testar com limite: \texttt{python src/run.py --limit 5};
+    \item executar completo: \texttt{python src/run.py};
+    \item avaliar sem RAGAS (rápido): \texttt{python src/evaluate.py --sem-ragas};
+    \item avaliar com RAGAS (mais lento): \texttt{python src/evaluate.py}.
 \end{enumerate}
 
-\section{Resultados Esperados}
-\label{sec:resultados}
+\begin{thebibliography}{9}
 
-\subsection{Outputs Gerados}
+\bibitem{lewis}
+P.~Lewis \textit{et al.},
+``Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks,''
+in \textit{Advances in Neural Information Processing Systems (NeurIPS)}, 2020.
 
-O pipeline gera os seguintes ficheiros na pasta outputs/:
-\begin{itemize}
-    \item \textbf{answers\_<pipeline>\_\_<modelo>.jsonl}: Respostas brutas de cada modelo para cada pergunta
-    \item \textbf{resultados\_por\_pergunta.csv}: Uma linha por pipeline x modelo x pergunta com todas as métricas
-    \item \textbf{resumo\_por\_modelo.csv}: Médias de todas as métricas por pipeline e modelo
-    \item \textbf{resumo\_por\_tipo.csv}: Médias por pipeline, modelo e tipo de pergunta
-\end{itemize}
+\bibitem{dpr}
+V.~Karpukhin \textit{et al.},
+``Dense Passage Retrieval for Open-Domain Question Answering,''
+in \textit{Proc.\ EMNLP}, 2020.
 
-\subsection{Análise Planeada}
+\bibitem{bm25}
+S.~Robertson and H.~Zaragoza,
+``The Probabilistic Relevance Framework: BM25 and Beyond,''
+\textit{Foundations and Trends in Information Retrieval}, vol.~3, no.~4, 2009.
 
-A análise dos resultados será focada em:
-\begin{itemize}
-    \item Tabela comparativa por modelo com todas as métricas
-    \item Gráficos por tipo de pergunta para identificar pontos fortes e fracos
-    \item Comparação das variantes do pipeline, em particular das variantes de pesquisa, primeiro com o check\_retrieval.py e depois com o melhor modelo
-    \item Exemplos de erros típicos por modelo
-    \item Correlação entre faithfulness (RAGAS) e valores\_corretos (determinística)
-    \item Análise de custo-benefício: latência e tokens vs. qualidade das respostas
-\end{itemize}
+\bibitem{rrf}
+G.~V.~Cormack, C.~L.~A.~Clarke and S.~B\"uettcher,
+``Reciprocal Rank Fusion Outperforms Condorcet and Individual Rank Learning Methods,''
+in \textit{Proc.\ SIGIR}, 2009.
 
-\section{Próximos Passos}
-\label{sec:proximos}
+\bibitem{snowball}
+M.~F.~Porter,
+``Snowball: A Language for Stemming Algorithms,''
+2001. \texttt{https://snowballstem.org}
 
-\begin{enumerate}
-    \item Concluir o OCR e a indexação do pipeline de referência
-    \item Verificar a recuperação com o check\_retrieval.py e comparar as variantes de pesquisa
-    \item Executar os seis modelos no pipeline de referência e avaliar os resultados
-    \item Alargar o conjunto de perguntas (meta: 40--60 perguntas, $\geq$5 por tipo)
-    \item Validar as respostas de referência com 2 pessoas do grupo
-    \item Executar as restantes variantes do pipeline com o melhor modelo
-\end{enumerate}
+\bibitem{ragas}
+S.~Es, J.~James, L.~Espinosa-Anke and S.~Schockaert,
+``RAGAS: Automated Evaluation of Retrieval Augmented Generation,''
+in \textit{Proc.\ EACL, System Demonstrations}, 2024.
 
-\section{Conclusões e Contribuições}
-\label{sec:conclusoes}
+\bibitem{qwen3}
+Qwen Team,
+``Qwen3 Technical Report,''
+\textit{arXiv:2505.09388}, 2025.
 
-Este projeto contribui com:
-\begin{itemize}
-    \item Um pipeline RAG padronizado para avaliação comparativa de LLMs
-    \item Um conjunto de variantes do pipeline que permite medir o efeito de cada decisão de desenho
-    \item Um conjunto de métricas abrangente (RAGAS + determinísticas)
-    \item Um dataset de perguntas específicas para o domínio das atas municipais
-    \item Decisões de desenho documentadas que garantem comparação justa
-    \item Código reutilizável para futuras avaliações
-\end{itemize}
+\bibitem{phi4}
+M.~Abdin \textit{et al.},
+``Phi-4 Technical Report,''
+\textit{arXiv:2412.08905}, 2024.
 
-As decisões de desenho, nomeadamente a recuperação fixa partilhada por todos os modelos, a variação de uma única decisão por variante do pipeline e a utilização de métricas determinísticas, permitem isolar os fatores de variação e obter conclusões robustas sobre o desempenho relativo dos diferentes modelos avaliados.
+\bibitem{gemma3}
+Gemma Team,
+``Gemma 3 Technical Report,''
+\textit{arXiv:2503.19786}, 2025.
+
+\end{thebibliography}
 
 \end{document}
