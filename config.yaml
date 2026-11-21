@@ -42,7 +42,9 @@ pipeline_defaults: &pipeline_defaults
     top_k: 5
   generation:
     temperature: 0.0
-    max_tokens: 512
+    # 1024 e não 512: o Qwen 3 gera raciocínio (<think>) que esgotava o teto de 512
+    # antes da resposta final (4 respostas vazias em 28 perguntas no primeiro ensaio).
+    max_tokens: 1024
   prompt:
     strict_grounding: true
     abstention_text: A informação não consta das atas fornecidas.

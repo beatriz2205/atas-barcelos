@@ -214,7 +214,7 @@ Cabeçalho com metadados em cada \textit{chunk}: [Ata n.º X | tipo | data] & As
 Atas identificadas pela data da reunião, e não pelo número & A numeração recomeça em cada mandato (Secção~\ref{sec:corpus}) \\ \midrule
 \textit{Embeddings} multilingues: embeddinggemma (servidor Ollama da universidade), com prefixos distintos para perguntas e documentos & Modelo multilingue treinado para pesquisa, disponível na infraestrutura da universidade; o mesmo modelo é usado para indexar e pesquisar \\ \midrule
 Top-k = 5 para todos os modelos & Recuperação idêntica para todos, eliminando variabilidade \\ \midrule
-\texttt{temperature} = 0 & Respostas determinísticas e reprodutíveis \\ \midrule
+\texttt{temperature} = 0 e \texttt{max\_tokens} = 1024 & Respostas determinísticas e reprodutíveis; o teto de 1024 deixa espaço ao raciocínio interno de modelos como o Qwen~3, que com 512 esgotava o limite antes da resposta final (4 de 28 respostas saíram vazias no primeiro ensaio) \\ \midrule
 \textit{Prompt} obriga a responder ``A informação não consta das atas fornecidas.'' quando não há informação & Permite medir alucinação de forma objetiva e determinística \\ \midrule
 Orquestrador/juiz RAGAS separado dos modelos avaliados (Gemma, 26B) & Evita que o juiz favoreça o próprio modelo; capacidade superior aos geradores, custo moderado (Secção~\ref{subsec:juiz}) \\ \midrule
 Limpeza de texto: remoção de tracejados, números de página, hifenização & Normalização do texto extraído dos PDFs \\ \midrule
@@ -256,7 +256,7 @@ O pipeline de referência usa recuperação semântica: a pergunta é convertida
 
 \subsection{Geração e \textit{Prompt}}
 
-As respostas são geradas com \texttt{temperature} = 0, para reprodutibilidade, e um \textit{prompt} de sistema que impõe três regras: responder apenas com base nos excertos fornecidos; responder ``A informação não consta das atas fornecidas.'' quando não há informação; e indicar as fontes no formato (Ata n.º X, AAAA-MM-DD), em português europeu. A imposição da citação da ata de origem permite às métricas determinísticas (Secção~\ref{sec:avaliacao}) verificar a correspondência entre a resposta e a ata correta; a variante \texttt{prompt\_sem\_fontes} remove esta exigência, para medir o seu efeito.
+As respostas são geradas com \texttt{temperature} = 0, para reprodutibilidade, e \texttt{max\_tokens} = 1024 --- um teto que deixa espaço ao raciocínio interno de modelos como o Qwen~3, que com o valor inicial de 512 esgotava o limite antes de produzir a resposta final --- e um \textit{prompt} de sistema que impõe três regras: responder apenas com base nos excertos fornecidos; responder ``A informação não consta das atas fornecidas.'' quando não há informação; e indicar as fontes no formato (Ata n.º X, AAAA-MM-DD), em português europeu. A imposição da citação da ata de origem permite às métricas determinísticas (Secção~\ref{sec:avaliacao}) verificar a correspondência entre a resposta e a ata correta; a variante \texttt{prompt\_sem\_fontes} remove esta exigência, para medir o seu efeito.
 
 \subsection{Desenho Experimental: Variantes do Pipeline}
 \label{subsec:variantes}
