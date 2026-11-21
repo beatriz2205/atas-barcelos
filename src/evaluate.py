@@ -10,6 +10,7 @@ Uso:
   python src/evaluate.py --sem-ragas     # só métricas determinísticas (rápido, sem juiz)
 """
 import argparse
+import json
 import re
 import unicodedata
 from pathlib import Path
@@ -125,7 +126,9 @@ def avaliar_ragas(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
             for r in sub.itertuples()
         ])
         res = evaluate(ds, metrics=metricas, llm=judge, embeddings=emb,
-                       run_config=RunConfig(max_workers=4, timeout=180))
+                       # timeout/menos workers: com 180 s e 4 em paralelo, um juiz de 26B
+                       # num servidor partilhado ultrapassa o limite em >60% dos julgamentos
+                       run_config=RunConfig(max_workers=2, timeout=600))
         rdf = res.to_pandas()
         rdf["id"], rdf["modelo"], rdf["pipeline"] = sub["id"].values, modelo, pipeline
         resultados.append(rdf.drop(columns=["user_input", "response", "retrieved_contexts",
@@ -141,9 +144,14 @@ def main():
 
     cfg = load_config()
     out = Path(cfg["paths"]["outputs_dir"])
-    linhas = [l for f in sorted(out.glob("answers_*.jsonl")) for l in read_jsonl(f)]
-    if not linhas:
+    # procura em outputs/<modelo>/<pipeline>/answers.jsonl (uma pasta de execução por
+    # modelo x pipeline); arquivos em subpastas (ex.: variacoes/) e ficheiros com outros
+    # nomes ficam de fora, para não entrar duas vezes no mesmo ensaio
+    execucoes = sorted(p.parent for p in out.rglob("answers.jsonl")
+                       if len(p.relative_to(out).parts) == 3)
+    if not execucoes:
         raise SystemExit("Sem respostas em outputs/. Corre primeiro src/run.py")
+    linhas = [l for d in execucoes for l in read_jsonl(d / "answers.jsonl")]
     df = pd.DataFrame(linhas)
     # Compatibilidade com resultados gerados antes da introdução de pipelines.
     if "pipeline" not in df:
@@ -161,6 +169,22 @@ def main():
     resumo.to_csv(out / "resumo_por_modelo.csv")
     df.groupby(["pipeline", "modelo", "tipo"])[num].mean().round(3).to_csv(out / "resumo_por_tipo.csv")
     print(resumo.T.to_string())
+
+    # cada pasta de execução fica autónoma: resultados da própria execução + contexto do juiz
+    for d in execucoes:
+        sub = df[(df["modelo"] == d.parts[-2]) & (df["pipeline"] == d.parts[-1])]
+        if sub.empty:
+            continue
+        sub.drop(columns=cols_fora, errors="ignore").to_csv(d / "avaliacao.csv", index=False)
+        sub.groupby("tipo")[num].mean().round(3).to_csv(d / "resumo_por_tipo.csv")
+        meta = json.loads((d / "meta.json").read_text(encoding="utf-8")) if (d / "meta.json").exists() else {}
+        meta["avaliacao"] = {
+            "data_hora": pd.Timestamp.now().isoformat(timespec="seconds"),
+            "ragas_ativado": not args.sem_ragas,
+            "juiz": cfg.get("judge", {}).get("model"),
+            "run_config_ragas": {"max_workers": 2, "timeout": 600} if not args.sem_ragas else None,
+        }
+        (d / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 if __name__ == "__main__":

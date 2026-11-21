@@ -1,0 +1,447 @@
+{
+  "migrado_de": "estrutura plana/antiga de outputs/",
+  "git_commit": "7f2270a665b277d91e55a435e046c8474fb27d12",
+  "modelo": {
+    "name": "qwen3-8b",
+    "model": "qwen3:8b"
+  },
+  "pipeline": {
+    "paths": {
+      "atas_dir": "/home/tiago/Bolsa_Investigacao/atas-barcelos/data/atas",
+      "pipelines_dir": "/home/tiago/Bolsa_Investigacao/atas-barcelos/data/pipelines",
+      "questions": "/home/tiago/Bolsa_Investigacao/atas-barcelos/data/questions.jsonl",
+      "outputs_dir": "/home/tiago/Bolsa_Investigacao/atas-barcelos/outputs"
+    },
+    "ollama": {
+      "host": "http://afonsinho.di.uminho.pt:4590",
+      "token_env": "OLLAMA_TOKEN",
+      "max_retries": 3,
+      "retry_delay_s": 5
+    },
+    "pipeline_defaults": {
+      "ocr": {
+        "language": "por",
+        "force_ocr": false,
+        "rotate_pages": true,
+        "deskew": false,
+        "clean": false,
+        "remove_background": false
+      },
+      "chunking": {
+        "max_chars": 1500,
+        "overlap_chars": 200
+      },
+      "embeddings": {
+        "provider": "ollama",
+        "model": "embeddinggemma:latest",
+        "query_prefix": "task: search result | query: ",
+        "document_prefix": "title: none | text: "
+      },
+      "retrieval": {
+        "top_k": 5
+      },
+      "generation": {
+        "temperature": 0.0,
+        "max_tokens": 1024
+      },
+      "prompt": {
+        "strict_grounding": true,
+        "abstention_text": "A informação não consta das atas fornecidas.",
+        "language": "português europeu",
+        "require_citations": true
+      }
+    },
+    "default_pipeline": "baseline",
+    "pipelines": {
+      "baseline": {
+        "ocr": {
+          "language": "por",
+          "force_ocr": false,
+          "rotate_pages": true,
+          "deskew": false,
+          "clean": false,
+          "remove_background": false
+        },
+        "chunking": {
+          "max_chars": 1500,
+          "overlap_chars": 200
+        },
+        "embeddings": {
+          "provider": "ollama",
+          "model": "embeddinggemma:latest",
+          "query_prefix": "task: search result | query: ",
+          "document_prefix": "title: none | text: "
+        },
+        "retrieval": {
+          "top_k": 5
+        },
+        "generation": {
+          "temperature": 0.0,
+          "max_tokens": 1024
+        },
+        "prompt": {
+          "strict_grounding": true,
+          "abstention_text": "A informação não consta das atas fornecidas.",
+          "language": "português europeu",
+          "require_citations": true
+        },
+        "description": "OCR com rotação, chunks por proposta, embeddinggemma, top-5 e prompt com fontes."
+      },
+      "ocr_deskew": {
+        "ocr": {
+          "language": "por",
+          "force_ocr": false,
+          "rotate_pages": true,
+          "deskew": true,
+          "clean": false,
+          "remove_background": false
+        },
+        "chunking": {
+          "max_chars": 1500,
+          "overlap_chars": 200
+        },
+        "embeddings": {
+          "provider": "ollama",
+          "model": "embeddinggemma:latest",
+          "query_prefix": "task: search result | query: ",
+          "document_prefix": "title: none | text: "
+        },
+        "retrieval": {
+          "top_k": 5
+        },
+        "generation": {
+          "temperature": 0.0,
+          "max_tokens": 1024
+        },
+        "prompt": {
+          "strict_grounding": true,
+          "abstention_text": "A informação não consta das atas fornecidas.",
+          "language": "português europeu",
+          "require_citations": true
+        },
+        "description": "Baseline com correção de inclinação das páginas digitalizadas."
+      },
+      "chunks_2500": {
+        "ocr": {
+          "language": "por",
+          "force_ocr": false,
+          "rotate_pages": true,
+          "deskew": false,
+          "clean": false,
+          "remove_background": false
+        },
+        "chunking": {
+          "max_chars": 2500,
+          "overlap_chars": 300
+        },
+        "embeddings": {
+          "provider": "ollama",
+          "model": "embeddinggemma:latest",
+          "query_prefix": "task: search result | query: ",
+          "document_prefix": "title: none | text: "
+        },
+        "retrieval": {
+          "top_k": 5
+        },
+        "generation": {
+          "temperature": 0.0,
+          "max_tokens": 1024
+        },
+        "prompt": {
+          "strict_grounding": true,
+          "abstention_text": "A informação não consta das atas fornecidas.",
+          "language": "português europeu",
+          "require_citations": true
+        },
+        "description": "Baseline com chunks maiores, para testar mais contexto por deliberação."
+      },
+      "top_k_10": {
+        "ocr": {
+          "language": "por",
+          "force_ocr": false,
+          "rotate_pages": true,
+          "deskew": false,
+          "clean": false,
+          "remove_background": false
+        },
+        "chunking": {
+          "max_chars": 1500,
+          "overlap_chars": 200
+        },
+        "embeddings": {
+          "provider": "ollama",
+          "model": "embeddinggemma:latest",
+          "query_prefix": "task: search result | query: ",
+          "document_prefix": "title: none | text: "
+        },
+        "retrieval": {
+          "top_k": 10
+        },
+        "generation": {
+          "temperature": 0.0,
+          "max_tokens": 1024
+        },
+        "prompt": {
+          "strict_grounding": true,
+          "abstention_text": "A informação não consta das atas fornecidas.",
+          "language": "português europeu",
+          "require_citations": true
+        },
+        "description": "Baseline com os dez excertos semanticamente mais próximos."
+      },
+      "hybrid_baseline": {
+        "ocr": {
+          "language": "por",
+          "force_ocr": false,
+          "rotate_pages": true,
+          "deskew": false,
+          "clean": false,
+          "remove_background": false
+        },
+        "chunking": {
+          "max_chars": 1500,
+          "overlap_chars": 200
+        },
+        "embeddings": {
+          "provider": "ollama",
+          "model": "embeddinggemma:latest",
+          "query_prefix": "task: search result | query: ",
+          "document_prefix": "title: none | text: "
+        },
+        "retrieval": {
+          "top_k": 5,
+          "hybrid": {
+            "fusion": "rrf",
+            "rrf_k": 60,
+            "bm25_language": "portuguese"
+          }
+        },
+        "generation": {
+          "temperature": 0.0,
+          "max_tokens": 1024
+        },
+        "prompt": {
+          "strict_grounding": true,
+          "abstention_text": "A informação não consta das atas fornecidas.",
+          "language": "português europeu",
+          "require_citations": true
+        },
+        "description": "Baseline com pesquisa híbrida (semântica + BM25 em português), fundida por RRF."
+      },
+      "hybrid_weighted": {
+        "ocr": {
+          "language": "por",
+          "force_ocr": false,
+          "rotate_pages": true,
+          "deskew": false,
+          "clean": false,
+          "remove_background": false
+        },
+        "chunking": {
+          "max_chars": 1500,
+          "overlap_chars": 200
+        },
+        "embeddings": {
+          "provider": "ollama",
+          "model": "embeddinggemma:latest",
+          "query_prefix": "task: search result | query: ",
+          "document_prefix": "title: none | text: "
+        },
+        "retrieval": {
+          "top_k": 5,
+          "hybrid": {
+            "fusion": "weighted",
+            "weights": {
+              "semantic": 0.7,
+              "sparse": 0.3
+            },
+            "bm25_language": "portuguese"
+          }
+        },
+        "generation": {
+          "temperature": 0.0,
+          "max_tokens": 1024
+        },
+        "prompt": {
+          "strict_grounding": true,
+          "abstention_text": "A informação não consta das atas fornecidas.",
+          "language": "português europeu",
+          "require_citations": true
+        },
+        "description": "Pesquisa híbrida com soma ponderada dos scores normalizados (alternativa ao RRF)."
+      },
+      "rerank": {
+        "ocr": {
+          "language": "por",
+          "force_ocr": false,
+          "rotate_pages": true,
+          "deskew": false,
+          "clean": false,
+          "remove_background": false
+        },
+        "chunking": {
+          "max_chars": 1500,
+          "overlap_chars": 200
+        },
+        "embeddings": {
+          "provider": "ollama",
+          "model": "embeddinggemma:latest",
+          "query_prefix": "task: search result | query: ",
+          "document_prefix": "title: none | text: "
+        },
+        "retrieval": {
+          "top_k": 5,
+          "rerank": {
+            "model": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+            "candidates": 20
+          }
+        },
+        "generation": {
+          "temperature": 0.0,
+          "max_tokens": 1024
+        },
+        "prompt": {
+          "strict_grounding": true,
+          "abstention_text": "A informação não consta das atas fornecidas.",
+          "language": "português europeu",
+          "require_citations": true
+        },
+        "description": "Baseline com reranking dos 20 primeiros excertos por um cross-encoder multilingue."
+      },
+      "filtro_data": {
+        "ocr": {
+          "language": "por",
+          "force_ocr": false,
+          "rotate_pages": true,
+          "deskew": false,
+          "clean": false,
+          "remove_background": false
+        },
+        "chunking": {
+          "max_chars": 1500,
+          "overlap_chars": 200
+        },
+        "embeddings": {
+          "provider": "ollama",
+          "model": "embeddinggemma:latest",
+          "query_prefix": "task: search result | query: ",
+          "document_prefix": "title: none | text: "
+        },
+        "retrieval": {
+          "top_k": 5,
+          "date_filter": true
+        },
+        "generation": {
+          "temperature": 0.0,
+          "max_tokens": 1024
+        },
+        "prompt": {
+          "strict_grounding": true,
+          "abstention_text": "A informação não consta das atas fornecidas.",
+          "language": "português europeu",
+          "require_citations": true
+        },
+        "description": "Baseline que, quando a pergunta indica a data de uma reunião, pesquisa só nessa ata."
+      },
+      "prompt_sem_fontes": {
+        "ocr": {
+          "language": "por",
+          "force_ocr": false,
+          "rotate_pages": true,
+          "deskew": false,
+          "clean": false,
+          "remove_background": false
+        },
+        "chunking": {
+          "max_chars": 1500,
+          "overlap_chars": 200
+        },
+        "embeddings": {
+          "provider": "ollama",
+          "model": "embeddinggemma:latest",
+          "query_prefix": "task: search result | query: ",
+          "document_prefix": "title: none | text: "
+        },
+        "retrieval": {
+          "top_k": 5
+        },
+        "generation": {
+          "temperature": 0.0,
+          "max_tokens": 1024
+        },
+        "prompt": {
+          "strict_grounding": true,
+          "abstention_text": "A informação não consta das atas fornecidas.",
+          "language": "português europeu",
+          "require_citations": false
+        },
+        "description": "Baseline sem obrigação de citar a ata no fim da resposta."
+      }
+    },
+    "models": [
+      {
+        "name": "qwen3-8b",
+        "model": "qwen3:8b"
+      },
+      {
+        "name": "gervasio-8b-ptpt",
+        "model": "hf.co/mradermacher/gervasio-8b-portuguese-ptpt-decoder-GGUF:Q4_K_M"
+      },
+      {
+        "name": "amalia-0626-dpo-9b",
+        "model": "amalia-9b-0626-dpo:latest"
+      },
+      {
+        "name": "amalia-0626-sft-9b",
+        "model": "amalia-9b-0626-sft:latest"
+      },
+      {
+        "name": "phi4-14b",
+        "model": "phi4:14b"
+      },
+      {
+        "name": "ministral-3-14b",
+        "model": "ministral-3:14b"
+      }
+    ],
+    "judge": {
+      "model": "gemma4:26b"
+    },
+    "ocr": {
+      "language": "por",
+      "force_ocr": false,
+      "rotate_pages": true,
+      "deskew": false,
+      "clean": false,
+      "remove_background": false
+    },
+    "chunking": {
+      "max_chars": 1500,
+      "overlap_chars": 200
+    },
+    "embeddings": {
+      "provider": "ollama",
+      "model": "embeddinggemma:latest",
+      "query_prefix": "task: search result | query: ",
+      "document_prefix": "title: none | text: "
+    },
+    "retrieval": {
+      "top_k": 5
+    },
+    "generation": {
+      "temperature": 0.0,
+      "max_tokens": 1024
+    },
+    "prompt": {
+      "strict_grounding": true,
+      "abstention_text": "A informação não consta das atas fornecidas.",
+      "language": "português europeu",
+      "require_citations": true
+    },
+    "nome": "baseline"
+  },
+  "ollama_host": "http://afonsinho.di.uminho.pt:4590",
+  "data_hora": "2026-11-21T19:48+00:00 (aprox.)",
+  "n_perguntas": 28,
+  "nota": "Avaliação RAGAS parcial das respostas a 1024 antes do preenchimento das vazias: 53/85 julgamentos com TimeoutError (juiz gemma4:26b sobrecarregado); incompleto, só para registo."
+}

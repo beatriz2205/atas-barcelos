@@ -11,9 +11,8 @@ data/atas/*
 data/chunks.jsonl
 data/chroma/
 
-# Resultados
-outputs/*
-!outputs/.gitkeep
+# Resultados (outputs/) passam a ser versionados: outputs/<modelo>/<pipeline>/answers.jsonl
+# + meta.json registam exatamente como cada resultado foi obtido.
 
 # Artefactos por pipeline (OCR, chunks, índice)
 data/pipelines/

@@ -1,0 +1,2 @@
+pipeline,modelo,latencia_s,tokens_out,abstencao_correta,alucinacao,falsa_recusa,valores_corretos,retrieval_hit@k,faithfulness,answer_relevancy,factual_correctness(mode=f1),llm_context_precision_with_reference,context_recall
+baseline,qwen3-8b,10.707,529.607,0.821,0.071,0.107,0.558,0.95,0.917,0.693,0.5,,0.818

@@ -9,7 +9,8 @@ PDFs atas ──► OCRmyPDF ──► ingest.py ──► chunks.jsonl ──�
 questions.jsonl ──────────────────────────────► run.py ◄───────┘
                                                   │  modelo A, B, C... (API OpenAI-compatível)
                                                   ▼
-                                          answers_<modelo>.jsonl ──► evaluate.py ──► CSVs
+                    outputs/<modelo>/<pipeline>/answers.jsonl ──► evaluate.py ──► CSVs
+                                                  │       └── meta.json (parâmetros, data, commit)
 ```
 
 ## 1. Decisões de desenho (para justificar no relatório)
@@ -134,7 +135,12 @@ nunca de `config.yaml`; `.env` está ignorado pelo Git. Cada pessoa pode assim c
 o projeto com a sua key, incluindo em simultâneo. Erros 504 são repetidos até três
 vezes, com cinco segundos entre tentativas.
 
-Resultados em `outputs/`: `resumo_por_modelo.csv`, `resumo_por_tipo.csv`, `resultados_por_pergunta.csv`.
+Resultados em `outputs/<modelo>/<pipeline>/`: cada pasta de execução tem
+`answers.jsonl` (respostas), `meta.json` (parâmetros efetivos, data e commit do Git
+— rastreabilidade completa do que foi corrido), `avaliacao.csv` e
+`resumo_por_tipo.csv`; na raiz de `outputs/` ficam as agregações globais
+`resumo_por_modelo.csv`, `resumo_por_tipo.csv`, `resultados_por_pergunta.csv`.
+Ensaios anteriores ficam arquivados em `variacoes/`, com o seu próprio `meta.json`.
 
 ### Pipelines RAG e comparação justa
 

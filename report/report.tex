@@ -486,9 +486,15 @@ atas-barcelos/
 |   |-- run.py               # Execução dos modelos
 |   `-- evaluate.py          # Avaliação dos resultados
 |-- report/                  # Este documento
-`-- outputs/                 # Resultados
-    |-- answers_<pipeline>__<modelo>.jsonl
-    |-- resultados_por_pergunta.csv
+`-- outputs/                 # Resultados, agrupados por modelo e depois por pipeline
+    |-- qwen3-8b/
+    |   `-- baseline/
+    |       |-- answers.jsonl      # respostas desta execução (modelo x pipeline)
+    |       |-- meta.json          # rastreabilidade: parâmetros, data, commit do Git
+    |       |-- avaliacao.csv      # resultados por pergunta
+    |       |-- resumo_por_tipo.csv
+    |       `-- variacoes/         # arquivos de ensaios anteriores, com o seu meta.json
+    |-- resultados_por_pergunta.csv  # agregação global (todos os modelos e pipelines)
     |-- resumo_por_modelo.csv
     `-- resumo_por_tipo.csv
 \end{verbatim}
@@ -501,18 +507,12 @@ O \texttt{ingest.py} utiliza o PyMuPDF para extração dos PDFs reconhecidos e t
 
 O módulo \texttt{rag.py} implementa o \texttt{Retriever}, recuperação semântica, pesquisa híbrida com normalização lexical, filtro por data e \textit{reranking} (Secção~\ref{subsec:pesquisa}), e o \texttt{Generator}, que envia a pergunta e os excertos ao modelo pelo cliente Ollama autenticado, com repetição automática em caso de \textit{timeout}. A avaliação (\texttt{evaluate.py}) normaliza o texto para comparação (remove acentos, normaliza números) e deteta automaticamente recusas e pedidos de clarificação com base em padrões.
 
+Para garantir rastreabilidade das execuções, cada pasta \texttt{outputs/<modelo>/<pipeline>/} inclui um ficheiro \texttt{meta.json} com os parâmetros efetivos de todas as secções do \textit{pipeline}, o servidor, a data e o \textit{commit} do Git no momento da execução; ensaios anteriores são arquivados na subpasta \texttt{variacoes/} com o seu próprio \texttt{meta.json}, o que permite reconstruir exatamente como cada resultado foi obtido.
+
 \section{Resultados Esperados e Análise Planeada}
 \label{sec:resultados}
 
-{\sloppy O \textit{pipeline} gera, na pasta \texttt{outputs/}: respostas brutas por
-\textit{pipeline} e modelo
-(\texttt{answers\_\allowbreak<pipeline>\_\allowbreak\_\allowbreak<modelo>.\allowbreak jsonl});
-resultados por pergunta, com todas as métricas
-(\texttt{resultados\_\allowbreak por\_\allowbreak pergunta.\allowbreak csv});
-e resumos agregados por modelo
-(\texttt{resumo\_\allowbreak por\_\allowbreak modelo.\allowbreak csv})
-e por tipo de pergunta
-(\texttt{resumo\_\allowbreak por\_\allowbreak tipo.\allowbreak csv}).\par}
+{\sloppy O \textit{pipeline} gera, na pasta \texttt{outputs/}, uma pasta de execução por modelo e \textit{pipeline} (\texttt{outputs/<modelo>/<pipeline>/}) com as respostas brutas (\texttt{answers.jsonl}) e um ficheiro de rastreabilidade (\texttt{meta.json}) com os parâmetros efetivos, a data e o \textit{commit} do Git; na raiz, os resultados agregados por pergunta (\texttt{resultados\_\allowbreak por\_\allowbreak pergunta.\allowbreak csv}) e resumos por modelo (\texttt{resumo\_\allowbreak por\_\allowbreak modelo.\allowbreak csv}) e por tipo de pergunta (\texttt{resumo\_\allowbreak por\_\allowbreak tipo.\allowbreak csv}).\par}
 
 A análise dos resultados decorrerá das duas questões de investigação e ficará focada em:
 
