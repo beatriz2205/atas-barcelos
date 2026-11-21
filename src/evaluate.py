@@ -21,6 +21,24 @@ from common import Embedder, load_config, read_jsonl, resolve_pipeline
 
 
 # ---------------------------------------------------------------- métricas próprias
+MESES = ("janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto",
+         "setembro", "outubro", "novembro", "dezembro")
+
+
+def datas_por_extenso(texto: str) -> str:
+    """Datas ISO do texto escritas por extenso ("2025-03-31" -> "31 de março de 2025").
+
+    O prompt pede as fontes no formato (Ata n.º X, AAAA-MM-DD) e os modelos tendem a
+    escrever também a data da resposta assim; sem esta conversão, uma resposta certa
+    perderia os valores esperados "31" ou "março" em valores_corretos.
+    """
+    return " ".join(
+        f"{int(d)} de {MESES[int(m) - 1]} de {a}"
+        for a, m, d in re.findall(r"\b(\d{4})-(\d{2})-(\d{2})\b", texto)
+        if 1 <= int(m) <= 12
+    )
+
+
 def norm(s: str) -> str:
     s = unicodedata.normalize("NFD", str(s).lower())
     s = "".join(c for c in s if unicodedata.category(c) != "Mn")
@@ -55,7 +73,7 @@ def metricas_proprias(row) -> dict:
     }
     esperados = row.get("valores_esperados") or []
     if resp and esperados:
-        r = norm(row["resposta"])
+        r = norm(row["resposta"] + " " + datas_por_extenso(row["resposta"]))
         out["valores_corretos"] = sum(norm(v) in r for v in esperados) / len(esperados)
     fontes = row.get("ata_fonte") or []
     if fontes:  # métrica de retrieval: alguma ata certa (pela data da reunião) nos top-k?
