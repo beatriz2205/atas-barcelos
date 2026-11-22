@@ -131,6 +131,9 @@ models:
     model: qwen3:8b
   - name: gervasio-8b-ptpt
     model: hf.co/mradermacher/gervasio-8b-portuguese-ptpt-decoder-GGUF:Q4_K_M
+    # A conversão GGUF no servidor não declara o fim de resposta do modelo: sem isto,
+    # o marcador "<|im_end|>" aparecia como texto no fim de 25 das 28 respostas.
+    stop: ["<|im_end|>"]
   - name: amalia-0626-dpo-9b
     model: amalia-9b-0626-dpo:latest
   - name: amalia-0626-sft-9b

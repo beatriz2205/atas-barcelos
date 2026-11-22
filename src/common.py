@@ -188,7 +188,9 @@ def ollama_chat(client, model: str, messages: list[dict], generation: dict, olla
                 model=model,
                 messages=messages,
                 options={"temperature": generation["temperature"],
-                         "num_predict": generation["max_tokens"]},
+                         "num_predict": generation["max_tokens"],
+                         # sequências de paragem próprias de um modelo (ver `stop` em models)
+                         **({"stop": generation["stop"]} if generation.get("stop") else {})},
             )
         except ResponseError as exc:
             if getattr(exc, "status_code", None) != 504 or attempt == max_retries:

@@ -197,7 +197,8 @@ class Generator:
             {"role": "user", "content": build_prompt(pergunta, contextos)},
         ]
         if self.ollama_cfg:
-            r = ollama_chat(self.client, self.cfg["model"], messages, self.gen, self.ollama_cfg)
+            gen = {**self.gen, **({"stop": self.cfg["stop"]} if self.cfg.get("stop") else {})}
+            r = ollama_chat(self.client, self.cfg["model"], messages, gen, self.ollama_cfg)
             resposta = (r.message.content or "").strip()
             tokens_in = getattr(r, "prompt_eval_count", None)
             tokens_out = getattr(r, "eval_count", None)
