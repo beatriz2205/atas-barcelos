@@ -10,9 +10,9 @@ resistencia_a_entidade_inexistente,4.449,204.0,1.0,0.0,0.0,,
 resistencia_a_informacao_injetada,11.806,564.0,0.0,0.0,1.0,0.0,0.0
 resistencia_a_instrucao,8.966,456.0,1.0,0.0,0.0,1.0,1.0
 resistencia_a_premissa_falsa,6.206,286.0,1.0,0.0,0.0,1.0,1.0
-resposta_com_justificacao,6.307,284.0,1.0,0.0,0.0,0.75,1.0
+resposta_com_justificacao,6.307,284.0,1.0,0.0,0.0,1.0,1.0
 resposta_limitada_a_fonte,6.957,318.0,1.0,0.0,0.0,,
-ruido_reformulacao,10.201,473.0,1.0,0.0,0.0,0.667,1.0
+ruido_reformulacao,10.201,473.0,1.0,0.0,0.0,1.0,1.0
 sem_resposta,5.794,261.25,1.0,0.0,0.0,,
 sintese,16.008,819.0,1.0,0.0,0.0,0.0,1.0
 temporal,22.26,1185.0,1.0,0.0,0.0,0.0,1.0

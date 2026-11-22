@@ -445,7 +445,7 @@
   "n_perguntas": 28,
   "nota": "Ensaio com max_tokens=1024: as respostas Q08, Q10, Q11 e Q26 saíram vazias (o raciocínio do Qwen 3 excedeu o teto de tokens) e foram preenchidas por diagnóstico sem limite (num_predict=-1), mesmo contexto e prompt; ver campo 'nota'.",
   "avaliacao": {
-    "data_hora": "2026-11-21T20:40:26",
+    "data_hora": "2026-11-22T23:50:25",
     "ragas_ativado": false,
     "juiz": "gemma4:26b",
     "run_config_ragas": null

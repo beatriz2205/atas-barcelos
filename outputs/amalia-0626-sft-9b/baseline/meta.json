@@ -1,0 +1,81 @@
+{
+  "data_hora": "2026-11-22T22:19:48",
+  "git_commit": "960c846e5db8f7e0b1f4d97bd83e7d7cd8add879",
+  "ollama_host": "http://afonsinho.di.uminho.pt:4590",
+  "modelo": {
+    "name": "amalia-0626-sft-9b",
+    "model": "amalia-9b-0626-sft:latest"
+  },
+  "pipeline": {
+    "nome": "baseline",
+    "ocr": {
+      "language": "por",
+      "force_ocr": false,
+      "rotate_pages": true,
+      "deskew": false,
+      "clean": false,
+      "remove_background": false
+    },
+    "chunking": {
+      "max_chars": 1500,
+      "overlap_chars": 200
+    },
+    "embeddings": {
+      "provider": "ollama",
+      "model": "embeddinggemma:latest",
+      "query_prefix": "task: search result | query: ",
+      "document_prefix": "title: none | text: "
+    },
+    "retrieval": {
+      "top_k": 5
+    },
+    "generation": {
+      "temperature": 0.0,
+      "max_tokens": 1024
+    },
+    "prompt": {
+      "strict_grounding": true,
+      "abstention_text": "A informação não consta das atas fornecidas.",
+      "language": "português europeu",
+      "require_citations": true
+    },
+    "description": "OCR com rotação, chunks por proposta, embeddinggemma, top-5 e prompt com fontes."
+  },
+  "n_perguntas": 28,
+  "ids_perguntas": [
+    "Q01",
+    "Q02",
+    "Q03",
+    "Q04",
+    "Q05",
+    "Q06",
+    "Q07",
+    "Q08",
+    "Q09",
+    "Q10",
+    "Q11",
+    "Q12",
+    "Q13",
+    "Q14",
+    "Q15",
+    "Q16",
+    "Q17",
+    "Q18",
+    "Q19",
+    "Q20",
+    "Q21",
+    "Q22",
+    "Q23",
+    "Q24",
+    "Q25",
+    "Q26",
+    "Q27",
+    "Q28"
+  ],
+  "avaliacao": {
+    "data_hora": "2026-11-22T23:50:25",
+    "ragas_ativado": false,
+    "juiz": "gemma4:26b",
+    "run_config_ragas": null
+  }
+}

@@ -1,2 +1,7 @@
 pipeline,modelo,latencia_s,tokens_out,abstencao_correta,alucinacao,falsa_recusa,valores_corretos,retrieval_hit@k
-baseline,qwen3-8b,10.744,517.75,0.821,0.071,0.107,0.621,0.95
+baseline,amalia-0626-dpo-9b,3.721,81.714,0.786,0.071,0.143,0.621,0.95
+baseline,amalia-0626-sft-9b,10.594,249.143,0.786,0.179,0.036,0.746,0.95
+baseline,gervasio-8b-ptpt,1.001,166.679,0.75,0.071,0.179,0.671,0.95
+baseline,ministral-3-14b,2.412,86.107,0.821,0.036,0.143,0.708,0.95
+baseline,phi4-14b,1.322,109.0,0.857,0.036,0.107,0.733,0.95
+baseline,qwen3-8b,10.744,517.75,0.821,0.071,0.107,0.65,0.95
