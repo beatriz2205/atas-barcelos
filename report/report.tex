@@ -23,7 +23,7 @@ sobre as Atas da Câmara Municipal de Barcelos}
 \author{
     Beatriz Miranda\\
     Tiago Martins\\[4pt]
-    \small Centro Algoritmi -- Universidade do Minho\\
+    \small Centro Algoritmi - Universidade do Minho\\
     \small Bolsa de Investigação
 }
 \date{2026}
@@ -48,13 +48,13 @@ Este trabalho avalia comparativamente modelos de linguagem de grande dimensão (
 
 Os modelos de linguagem de grande dimensão (LLMs) têm vindo a assumir um papel central na extração e no questionamento de informação em conjuntos documentais. Contudo, a sua aplicação à documentação administrativa em português europeu, neste caso, as atas das reuniões da Câmara Municipal de Barcelos, levanta desafios específicos que este trabalho procura caracterizar e medir. Para tal, é construído um pipeline RAG (\textit{Retrieval-Augmented Generation}; \cite{lewis}) padronizado, que ancora as respostas dos modelos nos excertos pertinentes das atas, e é definido um protocolo de avaliação comparativa devidamente controlado.
 
-O objetivo é duplo. Por um lado, pretende-se determinar que modelos, numa gama de recursos moderada (8--14 mil milhões de parâmetros), respondem de forma mais fiel e completa a perguntas sobre as deliberações municipais. Por outro, pretende-se quantificar o efeito de cada decisão de desenho do pipeline, OCR, \textit{chunking}, recuperação e \textit{prompt},na qualidade das respostas.
+O objetivo é duplo. Por um lado, pretende-se determinar que modelos, numa gama de recursos moderada (8 a 14 mil milhões de parâmetros), respondem de forma mais fiel e completa a perguntas sobre as deliberações municipais. Por outro, pretende-se quantificar o efeito de cada decisão de desenho do pipeline, OCR, \textit{chunking}, recuperação e \textit{prompt},na qualidade das respostas.
 
 Este duplo objetivo é materializado em duas questões de investigação:
 
 
 \begin{description}
-    \item[RQ1.] Que diferenças de desempenho apresentam modelos abertos de 8--14B, (i) de famílias distintas e (ii) de uma mesma família afinada por SFT e por DPO, na resposta a perguntas sobre documentação administrativa em português europeu?
+    \item[RQ1.] Que diferenças de desempenho apresentam modelos abertos de 8 a 14B, (i) de famílias distintas e (ii) de uma mesma família afinada por SFT e por DPO, na resposta a perguntas sobre documentação administrativa em português europeu?
     \item[RQ2.] Qual o efeito isolado de cada decisão do pipeline RAG (OCR, \textit{chunking}, estratégia de recuperação e \textit{prompt}) na qualidade da recuperação e das respostas?
 \end{description}
 
@@ -100,7 +100,7 @@ Em terceiro lugar, a amostra de modelos avaliados acompanha o panorama recente d
 O corpus é composto por 23 atas das reuniões da Câmara Municipal de Barcelos de 2025, obtidas em PDF no sítio do Município:
 \begin{itemize}
     \item atas n.º 1 a 20, de janeiro a setembro de 2025 (a ata n.º 18 não existe), incluindo uma reunião extraordinária (ata n.º 9, de 22 de abril);
-    \item atas n.º 1 a 4 do mandato 2025--2029, de novembro e dezembro de 2025.
+    \item atas n.º 1 a 4 do mandato 2025-2029, de novembro e dezembro de 2025.
 \end{itemize}
 
 Duas características do corpus condicionaram o desenho do pipeline:
@@ -256,7 +256,7 @@ O pipeline de referência usa recuperação semântica: a pergunta é convertida
 
 \subsection{Geração e \textit{Prompt}}
 
-As respostas são geradas com \texttt{temperature} = 0, para reprodutibilidade, e \texttt{max\_tokens} = 1024 --- um teto que deixa espaço ao raciocínio interno de modelos como o Qwen~3, que com o valor inicial de 512 esgotava o limite antes de produzir a resposta final --- e um \textit{prompt} de sistema que impõe três regras: responder apenas com base nos excertos fornecidos; responder ``A informação não consta das atas fornecidas.'' quando não há informação; e indicar as fontes no formato (Ata n.º X, AAAA-MM-DD), em português europeu. A imposição da citação da ata de origem permite às métricas determinísticas (Secção~\ref{sec:avaliacao}) verificar a correspondência entre a resposta e a ata correta; a variante \texttt{prompt\_sem\_fontes} remove esta exigência, para medir o seu efeito.
+As respostas são geradas com \texttt{temperature} = 0, para reprodutibilidade, e \texttt{max\_tokens} = 1024, um teto que deixa espaço ao raciocínio interno de modelos como o Qwen~3, que com o valor inicial de 512 esgotava o limite antes de produzir a resposta final, e um \textit{prompt} de sistema que impõe três regras: responder apenas com base nos excertos fornecidos; responder ``A informação não consta das atas fornecidas.'' quando não há informação; e indicar as fontes no formato (Ata n.º X, AAAA-MM-DD), em português europeu. A imposição da citação da ata de origem permite às métricas determinísticas (Secção~\ref{sec:avaliacao}) verificar a correspondência entre a resposta e a ata correta; a variante \texttt{prompt\_sem\_fontes} remove esta exigência, para medir o seu efeito.
 
 \subsection{Desenho Experimental: Variantes do Pipeline}
 \label{subsec:variantes}
@@ -294,7 +294,7 @@ As variantes que só alteram a recuperação ou o \textit{prompt} produzem o mes
 \subsection{Modelos Avaliados}
 \label{subsec:modelos}
 
-Para responder à RQ1, os modelos foram selecionados segundo três critérios: (i) gama de parâmetros de 8--14\,B, que constitui o compromisso exequível entre capacidade e latência na infraestrutura disponível; (ii) disponibilidade de modelos abertos no servidor Ollama da universidade; e (iii) variedade de famílias e de estratégias de afinação, de modo a permitir tanto comparações entre famílias como uma comparação controlada dentro de uma mesma família.
+Para responder à RQ1, os modelos foram selecionados segundo três critérios: (i) gama de parâmetros de 8 a 14\,B, que constitui o compromisso exequível entre capacidade e latência na infraestrutura disponível; (ii) disponibilidade de modelos abertos no servidor Ollama da universidade; e (iii) variedade de famílias e de estratégias de afinação, de modo a permitir tanto comparações entre famílias como uma comparação controlada dentro de uma mesma família.
 
 \begin{table}[h!]
 \centering
@@ -312,7 +312,7 @@ Ministral~3~14B & 14B & Mistral AI & Segundo par de 14B \\ \bottomrule
 \end{tabular}
 \end{table}
 
-A composição da amostra permite três comparações controladas: entre famílias à mesma escala (os dois pares, de 8--9B e de 14B); entre especialização em português e generalismo (Gervásio vs.\ Qwen~3); e dentro da mesma família, entre estratégias de afinação (AMALIA SFT vs.\ DPO) --- esta última é a única comparação em que família, escala e ascendente de treino se mantêm constantes, pelo que a diferença observada é diretamente atribuível à estratégia de alinhamento.
+A composição da amostra permite três comparações controladas: entre famílias à mesma escala (os dois pares, de 8 a 9B e de 14B); entre especialização em português e generalismo (Gervásio vs.\ Qwen~3); e dentro da mesma família, entre estratégias de afinação (AMALIA SFT vs.\ DPO), esta última é a única comparação em que família, escala e ascendente de treino se mantêm constantes, pelo que a diferença observada é diretamente atribuível à estratégia de alinhamento.
 
 Os resultados serão sempre discutidos com o número de parâmetros em conta: as diferenças entre 8B e 14B não serão atribuídas apenas à família do modelo. 
 
@@ -321,7 +321,7 @@ Registe-se uma limitação: o Gervásio é avaliado numa versão quantizada para
 \subsection{Orquestrador e Modelo Juiz}
 \label{subsec:juiz}
 
-O modelo \texttt{gemma4:26b} (família Gemma; \cite{gemma3}) foi escolhido como orquestrador/juiz das métricas RAGAS. Tem 26B parâmetros, acima dos geradores de 8--14B --- como é exigível, para que o juiz avalie modelos comparáveis ou inferiores em capacidade --- e não pertence à amostra avaliada. 
+O modelo \texttt{gemma4:26b} (família Gemma; \cite{gemma3}) foi escolhido como orquestrador/juiz das métricas RAGAS. Tem 26B parâmetros, acima dos geradores de 8 a 14B, como é exigível, para que o juiz avalie modelos comparáveis ou inferiores em capacidade, e não pertence à amostra avaliada. 
 
 Neste projeto, ``orquestrador'' significa o avaliador que coordena o julgamento das respostas nas métricas RAGAS; não responde às perguntas do conjunto experimental. As respostas medidas são sempre produzidas pelos seis modelos da Secção~\ref{subsec:modelos}.
 
@@ -532,7 +532,7 @@ A análise dos resultados decorrerá das duas questões de investigação e fica
 
 Este projeto construiu uma infraestrutura completa de avaliação de LLMs com RAG sobre documentação administrativa em português europeu: um corpus de 23 atas com metadados fiáveis; um pipeline modular de referência e oito variantes de ablação; seis modelos organizados em dois eixos de comparação controlada; um protocolo de avaliação que combina métricas RAGAS, julgadas por um modelo externo à amostra, com métricas determinísticas de precisão, alucinação e abstenção; e um conjunto inicial de 28 perguntas com respostas de referência confirmadas junto das fontes.
 
-A ingestão e a indexação do \texttt{baseline} estão concluídas (2443 \textit{chunks}), e a recuperação foi verificada com o \texttt{check\_retrieval.py} para as variantes de pesquisa. O trabalho seguinte consiste em: executar os seis modelos e avaliar os resultados; alargar o conjunto de perguntas até 40--60 (meta de $\geq$5 por categoria, com validação por dois membros do grupo); e executar as restantes variantes do pipeline com o melhor modelo.
+A ingestão e a indexação do \texttt{baseline} estão concluídas (2443 \textit{chunks}), e a recuperação foi verificada com o \texttt{check\_retrieval.py} para as variantes de pesquisa. O trabalho seguinte consiste em: executar os seis modelos e avaliar os resultados; alargar o conjunto de perguntas até 40 a 60 (meta de $\geq$5 por categoria, com validação por dois membros do grupo); e executar as restantes variantes do pipeline com o melhor modelo.
 
 Os resultados experimentais e a respetiva discussão serão reportados numa versão subsequente deste documento.
 

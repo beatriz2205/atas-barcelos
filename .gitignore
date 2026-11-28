@@ -9,9 +9,7 @@ venv/
 data/atas/*
 !data/atas/.gitkeep
 data/chunks.jsonl
-data/chroma/
-
-# Resultados (outputs/) passam a ser versionados: outputs/<modelo>/<pipeline>/answers.jsonl
+data/chroma/# Resultados (outputs/) passam a ser versionados: outputs/<modelo>/<pipeline>/answers.jsonl
 # + meta.json registam exatamente como cada resultado foi obtido.
 
 # Artefactos por pipeline (OCR, chunks, índice)
